@@ -1,7 +1,25 @@
 <?php
 require_once '../includes/auth.php';
 requireAdmin();
-require_once '../config/db_config.php'; // JsonDB + TokenAuth
+require_once '../config/db.php'; // MySQL
+require_once '../config/TokenAuth.php';
+$auth = new TokenAuth();
+
+// Helper to add column if missing
+function ensureColumn($con, $table, $col, $definition) {
+    $safeTable = mysqli_real_escape_string($con, $table);
+    $safeCol   = mysqli_real_escape_string($con, $col);
+    $checkSql = "
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$safeTable' AND COLUMN_NAME = '$safeCol'
+        LIMIT 1";
+    $exists = mysqli_query($con, $checkSql);
+    if ($exists && mysqli_num_rows($exists) > 0) {
+        mysqli_free_result($exists);
+        return;
+    }
+    mysqli_query($con, "ALTER TABLE `$table` ADD COLUMN $definition");
+}
 
 $pageTitle = 'Popular Picks';
 $activePage = 'popular_picks';
@@ -11,21 +29,29 @@ $messageType = 'success';
 // Handle POST updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $featuredIds = isset($_POST['featured']) && is_array($_POST['featured']) ? array_map('intval', $_POST['featured']) : [];
-
-    // Fetch all menu items
-    $items = $db->select('menu_items');
-    foreach ($items as $item) {
-        $id = $item['id'];
-        $isFeatured = in_array($id, $featuredIds, true) ? 1 : 0;
-        if ((int)($item['featured'] ?? 0) !== $isFeatured) {
-            $db->update('menu_items', ['featured' => $isFeatured], ['id' => $id]);
-        }
+    // Ensure columns exist
+    ensureColumn($con, 'menu_items', 'featured', "featured TINYINT(1) NOT NULL DEFAULT 0");
+    foreach ($featuredIds as $fid) {
+        mysqli_query($con, "UPDATE menu_items SET featured = 1 WHERE id = $fid");
     }
+    // Clear others
+    $idsStr = $featuredIds ? implode(',', $featuredIds) : '0';
+    mysqli_query($con, "UPDATE menu_items SET featured = 0 WHERE id NOT IN ($idsStr)");
     $message = 'Popular picks updated.';
 }
 
+// Ensure columns exist
+ensureColumn($con, 'menu_items', 'availability', "availability VARCHAR(20) NOT NULL DEFAULT 'Available'");
+ensureColumn($con, 'menu_items', 'updated_at', "updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+
 // Reload items after potential update
-$menuItems = $db->select('menu_items', ['availability' => 'Available'], ['updated_at' => 'DESC']);
+$menuItems = [];
+$res = mysqli_query($con, "SELECT mi.*, c.category_name FROM menu_items mi LEFT JOIN categories c ON mi.category_id = c.id ORDER BY mi.updated_at DESC, mi.id DESC");
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) {
+        $menuItems[] = $row;
+    }
+}
 
 include '../includes/header.php';
 ?>

@@ -1,6 +1,11 @@
 <?php
-require_once '../config/db_config.php';
+require_once '../config/db.php';
 require_once '../includes/mailer.php';
+require_once '../config/TokenAuth.php';
+$auth = new TokenAuth();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $title = "Forgot Password - Cloud 9 Cafe";
 $status = null;
@@ -13,7 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please enter a valid email address.";
     } else {
         // Look up user by email (users or admins)
-        $user = $db->selectOne('cafe_users', ['email' => $email]) ?: $db->selectOne('cafe_admins', ['email' => $email]);
+        $stmt = mysqli_prepare($con, "SELECT * FROM users WHERE email = ? LIMIT 1");
+        mysqli_stmt_bind_param($stmt, "s", $email);
+        mysqli_stmt_execute($stmt);
+        $res = mysqli_stmt_get_result($stmt);
+        $user = $res ? mysqli_fetch_assoc($res) : null;
+        mysqli_stmt_close($stmt);
 
         if (!$user) {
             $error = "We couldn't find an account with that email.";
@@ -22,12 +32,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $token = bin2hex(random_bytes(32));
             $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
-            $db->insert('password_resets', [
-                'email'      => $email,
-                'token'      => $token,
-                'expires_at' => $expiresAt,
-                'used'       => 0
-            ]);
+            @mysqli_query($con, "CREATE TABLE IF NOT EXISTS password_resets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(150) NOT NULL,
+                token VARCHAR(255) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $stmt2 = mysqli_prepare($con, "INSERT INTO password_resets (email, token, expires_at, used) VALUES (?, ?, ?, 0)");
+            mysqli_stmt_bind_param($stmt2, "sss", $email, $token, $expiresAt);
+            mysqli_stmt_execute($stmt2);
+            mysqli_stmt_close($stmt2);
 
             // Build reset link
             $env = loadEnv(__DIR__ . '/../.env');
@@ -36,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $subject = 'Reset your Cloud 9 Cafe password';
             $body = "
-                <p>Hi " . htmlspecialchars($user['fullname'] ?? 'there') . ",</p>
+                <p>Hi " . htmlspecialchars($user['full_name'] ?? $user['fullname'] ?? 'there') . ",</p>
                 <p>We received a request to reset your Cloud 9 Cafe password. Click the button below to set a new one:</p>
                 <p style='text-align:center; margin: 24px 0;'>
                     <a href='{$resetLink}' style='background:#667eea;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;display:inline-block;'>Reset Password</a>

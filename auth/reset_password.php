@@ -1,5 +1,8 @@
 <?php
-require_once '../config/db_config.php';
+require_once '../config/db.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $title = "Reset Password - Cloud 9 Cafe";
 $error = null;
@@ -10,7 +13,13 @@ $token = $_GET['token'] ?? ($_POST['token'] ?? '');
 $resetRequest = null;
 
 if ($token) {
-    $resetRequest = $db->selectOne('password_resets', ['token' => $token]);
+    $stmt = mysqli_prepare($con, "SELECT * FROM password_resets WHERE token = ? LIMIT 1");
+    mysqli_stmt_bind_param($stmt, "s", $token);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    $resetRequest = $res ? mysqli_fetch_assoc($res) : null;
+    mysqli_stmt_close($stmt);
+
     if (!$resetRequest) {
         $error = "This reset link is invalid. Please request a new one.";
     } elseif (!empty($resetRequest['used'])) {
@@ -33,14 +42,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     } else {
         // Update user/admin password
         $email = $resetRequest['email'] ?? '';
-        $updated = $db->update('cafe_users', ['password' => $newPassword], ['email' => $email]);
-        if ($updated === 0) {
-            $updated = $db->update('cafe_admins', ['password' => $newPassword], ['email' => $email]);
-        }
+        $hash = password_hash($newPassword, PASSWORD_BCRYPT);
+
+        $stmtU = mysqli_prepare($con, "UPDATE users SET password=? WHERE email=? LIMIT 1");
+        mysqli_stmt_bind_param($stmtU, "ss", $hash, $email);
+        mysqli_stmt_execute($stmtU);
+        $updated = mysqli_stmt_affected_rows($stmtU);
+        mysqli_stmt_close($stmtU);
 
         if ($updated > 0) {
-            // Mark token as used
-            $db->update('password_resets', ['used' => 1, 'used_at' => date('Y-m-d H:i:s')], ['token' => $token]);
+            $stmtTok = mysqli_prepare($con, "UPDATE password_resets SET used = 1, used_at = NOW() WHERE token = ?");
+            mysqli_stmt_bind_param($stmtTok, "s", $token);
+            mysqli_stmt_execute($stmtTok);
+            mysqli_stmt_close($stmtTok);
             $status = "Your password has been updated. You can now log in.";
         } else {
             $error = "We couldn't update your password. Please request a new reset link.";

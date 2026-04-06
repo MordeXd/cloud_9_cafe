@@ -18,38 +18,46 @@
  */
 
 // =============================================================================
-// SECTION: Database & Authentication Setup
-// DESCRIPTION: Includes the database configuration file which initializes
-//              the JsonDB connection and TokenAuth system for cookie-based auth
+// SECTION: Database & Authentication Setup (MySQL + Session)
 // =============================================================================
-include_once(__DIR__ . "/../config/db_config.php");
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/TokenAuth.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$auth = new TokenAuth();
 
 // =============================================================================
 // SECTION: User Session Data Fetching
-// DESCRIPTION: If user is logged in via cookie auth, fetch their profile data
-//              and calculate their cart item count for display in navbar
+// DESCRIPTION: Fetch user profile and cart count using MySQL tables
 // =============================================================================
-$current_user_data = null;  // Stores logged-in user's profile data
-$cart_count = 0;            // Stores total items in user's cart
-$display_name = 'User';     // Display name fallback
+$current_user_data = null;
+$cart_count = 0;
+$display_name = 'User';
 
-// Check if user is logged in using cookie-based auth
-if ($auth->isUserLoggedIn()) {
-    $uid = $auth->getUserId();  // Get user ID from auth cookie
-    
-    // Fetch user profile from database
-    $current_user_data = $db->selectOne('cafe_users', ['id' => $uid]);
-    if (!empty($current_user_data['fullname'])) {
+$loggedInUserId = null;
+if (!empty($_SESSION['user_id'])) {
+    $loggedInUserId = (int)$_SESSION['user_id'];
+} elseif ($auth->isUserLoggedIn()) {
+    $loggedInUserId = (int)$auth->getUserId();
+    $_SESSION['user_id'] = $loggedInUserId;
+}
+
+if ($loggedInUserId) {
+    $userRes = mysqli_query($con, "SELECT * FROM users WHERE id = $loggedInUserId LIMIT 1");
+    $current_user_data = $userRes ? mysqli_fetch_assoc($userRes) : null;
+    if (!empty($current_user_data['full_name'])) {
+        $display_name = $current_user_data['full_name'];
+    } elseif (!empty($current_user_data['fullname'])) {
         $display_name = $current_user_data['fullname'];
-    } else {
-        // Fallback to token payload name if profile missing
+    } elseif ($auth->isUserLoggedIn()) {
         $display_name = $auth->getUserName() ?: 'User';
     }
-    
-    // Get cart item count for navbar badge
-    $cartItems = $db->select('cafe_cart', ['user_id' => $uid]);
-    foreach ($cartItems as $item) {
-        $cart_count += $item['quantity'];
+
+    $cartRes = mysqli_query($con, "SELECT COALESCE(SUM(quantity),0) AS qty FROM cart WHERE user_id = $loggedInUserId");
+    if ($cartRes) {
+        $row = mysqli_fetch_assoc($cartRes);
+        $cart_count = (int)($row['qty'] ?? 0);
     }
 }
 // =============================================================================
@@ -152,7 +160,7 @@ if ($auth->isUserLoggedIn()) {
                     // If YES: Show Cart icon and User dropdown menu
                     // If NO:  Show Login and Register buttons
                     // =====================================================================
-                    if ($auth->isUserLoggedIn()): 
+                    if ($loggedInUserId):
                     ?>
                         <!-- Cart Icon with Badge - Click redirects to: user/cart.php -->
                         <li class="nav-item me-3">

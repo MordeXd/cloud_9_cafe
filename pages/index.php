@@ -1,49 +1,62 @@
 <?php
-require_once '../config/db_config.php';
+// Use MySQL data (not JSON files)
+require_once '../config/db.php';
+require_once '../config/TokenAuth.php';
+$auth = new TokenAuth();
 $title = "Home - Cloud 9 Cafe"; 
 
-// Popular Picks: priority 1) featured & available, 2) top sellers, 3) random available
-$popular_items = $db->select('menu_items', ['featured' => 1, 'availability' => 'Available'], ['updated_at' => 'DESC'], 4);
+// Helper: add column only if missing
+function ensureColumn($con, $table, $col, $definition) {
+    $safeTable = mysqli_real_escape_string($con, $table);
+    $safeCol   = mysqli_real_escape_string($con, $col);
+    $checkSql = "
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$safeTable' AND COLUMN_NAME = '$safeCol'
+        LIMIT 1";
+    $exists = mysqli_query($con, $checkSql);
+    if ($exists && mysqli_num_rows($exists) > 0) {
+        mysqli_free_result($exists);
+        return;
+    }
+    mysqli_query($con, "ALTER TABLE `$table` ADD COLUMN $definition");
+}
+
+// Popular Picks from MySQL: prefer featured flag if present, fall back to newest active items
+$popular_items = [];
+
+// Ensure optional columns exist (featured, availability, updated_at)
+ensureColumn($con, 'menu_items', 'featured', "featured TINYINT(1) NOT NULL DEFAULT 0");
+ensureColumn($con, 'menu_items', 'availability', "availability VARCHAR(20) NOT NULL DEFAULT 'Available'");
+ensureColumn($con, 'menu_items', 'updated_at', "updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+
+$featuredSql = "
+    SELECT mi.*, c.category_name 
+    FROM menu_items mi
+    LEFT JOIN categories c ON mi.category_id = c.id
+    WHERE mi.status = 'active' AND mi.availability = 'Available' AND mi.featured = 1
+    ORDER BY COALESCE(mi.updated_at, mi.created_at, mi.id) DESC
+    LIMIT 4";
+$res = mysqli_query($con, $featuredSql);
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) {
+        $popular_items[] = $row;
+    }
+}
 
 if (count($popular_items) < 4) {
-    // Build top sellers list from order items
-    $sales = [];
-    $orderItems = $db->select('cafe_order_items');
-    foreach ($orderItems as $oi) {
-        $mid = $oi['menu_item_id'] ?? null;
-        if (!$mid) continue;
-        $sales[$mid] = ($sales[$mid] ?? 0) + (int)($oi['quantity'] ?? 0);
-    }
-    arsort($sales); // highest quantity first
-
-    // Fetch all available items to pull from
-    $availableItems = $db->select('menu_items', ['availability' => 'Available']);
-    $availableById = [];
-    foreach ($availableItems as $item) {
-        if (!isset($item['id'])) continue;
-        $availableById[$item['id']] = $item;
-    }
-
-    // Add top sellers not already in list
-    foreach ($sales as $mid => $qty) {
-        if (count($popular_items) >= 4) break;
-        if (isset($availableById[$mid])) {
-            // avoid duplicates
-            $already = array_filter($popular_items, fn($p) => isset($p['id']) && $p['id'] == $mid);
-            if (empty($already)) {
-                $popular_items[] = $availableById[$mid];
-            }
-        }
-    }
-
-    // If still not enough, fill with random available items
-    if (count($popular_items) < 4 && !empty($availableItems)) {
-        shuffle($availableItems);
-        foreach ($availableItems as $item) {
-            if (count($popular_items) >= 4) break;
-            $already = array_filter($popular_items, fn($p) => isset($p['id']) && $p['id'] == ($item['id'] ?? null));
-            if (empty($already)) {
-                $popular_items[] = $item;
+    $fallbackSql = "
+        SELECT mi.*, c.category_name
+        FROM menu_items mi
+        LEFT JOIN categories c ON mi.category_id = c.id
+        WHERE mi.status = 'active' AND mi.availability = 'Available'
+        ORDER BY COALESCE(mi.updated_at, mi.created_at, mi.id) DESC
+        LIMIT 8";
+    $res2 = mysqli_query($con, $fallbackSql);
+    if ($res2) {
+        while ($row = mysqli_fetch_assoc($res2)) {
+            $already = array_filter($popular_items, fn($p) => $p['id'] == $row['id']);
+            if (empty($already) && count($popular_items) < 4) {
+                $popular_items[] = $row;
             }
         }
     }
@@ -170,9 +183,9 @@ ob_start();
         <?php if (!empty($popular_items)): ?>
             <div class="row g-4">
                 <?php foreach ($popular_items as $index => $item): 
-                    $img = $item['image'] ?? 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400';
-                    if (strpos($img, 'http') !== 0) {
-                        $img = '/cloud_9_cafe/' . ltrim($img, '/');
+                    $img = $item['item_image'] ?? $item['image'] ?? 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400';
+                    if ($img && strpos($img, 'http') !== 0) {
+                        $img = '/cloud_9_cafe/uploads/' . ltrim($img, '/');
                     }
                 ?>
                 <div class="col-md-6 col-lg-3 animate-on-scroll stagger-<?php echo $index + 1; ?>">
@@ -185,19 +198,19 @@ ob_start();
                             <!-- Placeholder shown if image fails to load -->
                             <div class="product-placeholder" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--cafe-primary-light) 0%, var(--cafe-primary) 100%); align-items: center; justify-content: center; flex-direction: column;">
                                 <i class="fas fa-coffee fa-3x text-white mb-2"></i>
-                                <span class="text-white small"><?php echo htmlspecialchars($item['category'] ?? ''); ?></span>
+                                <span class="text-white small"><?php echo htmlspecialchars($item['category_name'] ?? $item['category'] ?? ''); ?></span>
                             </div>
                             <div class="product-overlay">
                                 <button class="btn btn-light rounded-pill add-to-cart-btn" 
                                         data-item-id="<?php echo $item['id']; ?>"
-                                        data-item-name="<?php echo htmlspecialchars($item['name'] ?? ''); ?>">
+                                        data-item-name="<?php echo htmlspecialchars($item['item_name'] ?? $item['name'] ?? ''); ?>">
                                     <i class="fas fa-plus me-1"></i> Add to Cart
                                 </button>
                             </div>
-                            <span class="badge bg-primary position-absolute top-0 start-0 m-3"><?php echo htmlspecialchars($item['category'] ?? ''); ?></span>
+                            <span class="badge bg-primary position-absolute top-0 start-0 m-3"><?php echo htmlspecialchars($item['category_name'] ?? $item['category'] ?? ''); ?></span>
                         </div>
                         <div class="product-info">
-                            <h5 class="product-title"><?php echo htmlspecialchars($item['name'] ?? ''); ?></h5>
+                            <h5 class="product-title"><?php echo htmlspecialchars($item['item_name'] ?? $item['name'] ?? ''); ?></h5>
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="product-price">₹<?php echo number_format($item['price'] ?? 0, 0); ?></span>
                                 <div class="text-warning small">

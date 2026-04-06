@@ -40,10 +40,14 @@ header('Content-Type: application/json');
 // =============================================================================
 
 // =============================================================================
-// SECTION: Database & Authentication Include
-// DESCRIPTION: Include database config which initializes JsonDB and TokenAuth
+// SECTION: Database & Authentication Include (MySQL)
 // =============================================================================
-require_once '../config/db_config.php';
+require_once '../config/db.php';
+require_once '../config/TokenAuth.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$auth = new TokenAuth();
 // =============================================================================
 // END SECTION: Database & Authentication Include
 // =============================================================================
@@ -53,9 +57,13 @@ require_once '../config/db_config.php';
 // DESCRIPTION: Verify user is logged in, return redirect if not
 // =============================================================================
 
-// Check if user is logged in using cookie-based authentication
-// FUNCTION: $auth->isUserLoggedIn() - Returns true if valid user auth cookie exists
-if (!$auth->isUserLoggedIn()) {
+// Check if user is logged in (session or token)
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id && $auth->isUserLoggedIn()) {
+    $user_id = $auth->getUserId();
+    $_SESSION['user_id'] = $user_id;
+}
+if (!$user_id) {
     
     // User not logged in - return JSON with redirect URL
     // Client-side JavaScript will handle the redirect
@@ -99,10 +107,6 @@ if (!$data || !isset($data['item_id'])) {
 // DESCRIPTION: Extract and sanitize input data
 // =============================================================================
 
-// Get current logged-in user's ID from auth cookie
-// FUNCTION: $auth->getUserId() - Returns user ID from auth token
-$user_id = $auth->getUserId();
-
 // Get menu item ID from request and convert to integer
 // FUNCTION: intval() - Converts value to integer (sanitization)
 $menu_item_id = intval($data['item_id']);
@@ -118,10 +122,13 @@ $quantity = intval($data['quantity'] ?? 1);
 // DESCRIPTION: Verify the menu item exists in database
 // =============================================================================
 
-// Fetch menu item from database
-// FUNCTION: $db->selectOne() - Gets single record matching conditions
-// PARAMETERS: 'menu_items' = table, ['id' => $menu_item_id] = WHERE clause
-$item = $db->selectOne('menu_items', ['id' => $menu_item_id]);
+// Fetch menu item from MySQL
+$stmt = mysqli_prepare($con, "SELECT * FROM menu_items WHERE id = ? AND status = 'active' LIMIT 1");
+mysqli_stmt_bind_param($stmt, "i", $menu_item_id);
+mysqli_stmt_execute($stmt);
+$itemRes = mysqli_stmt_get_result($stmt);
+$item = $itemRes ? mysqli_fetch_assoc($itemRes) : null;
+mysqli_stmt_close($stmt);
 
 // Check if item exists
 if (!$item) {
@@ -141,31 +148,14 @@ if (!$item) {
 // =============================================================================
 
 // Check if this item is already in user's cart
-// FUNCTION: $db->selectOne() - Check for existing cart item
-$existing = $db->selectOne('cafe_cart', [
-    'user_id' => $user_id, 
-    'menu_item_id' => $menu_item_id
-]);
+$existingRes = mysqli_query($con, "SELECT id, quantity FROM cart WHERE user_id = $user_id AND menu_item_id = $menu_item_id LIMIT 1");
+$existing = $existingRes ? mysqli_fetch_assoc($existingRes) : null;
 
 if ($existing) {
-    // Item already in cart - update quantity
     $newQty = $existing['quantity'] + $quantity;
-    
-    // Update cart item quantity
-    // FUNCTION: $db->update() - Updates existing record
-    // PARAMETERS: table, new data, where conditions
-    $db->update('cafe_cart', ['quantity' => $newQty], ['id' => $existing['id']]);
-    
+    mysqli_query($con, "UPDATE cart SET quantity = $newQty WHERE id = {$existing['id']}");
 } else {
-    // Item not in cart - insert new cart item
-    // FUNCTION: $db->insert() - Creates new record
-    // PARAMETERS: table, data array
-    $db->insert('cafe_cart', [
-        'user_id' => $user_id,           // Who owns this cart item
-        'menu_item_id' => $menu_item_id, // Which menu item
-        'quantity' => $quantity,         // How many
-        'customization' => ''            // Custom instructions (empty for now)
-    ]);
+    mysqli_query($con, "INSERT INTO cart (user_id, menu_item_id, quantity) VALUES ($user_id, $menu_item_id, $quantity)");
 }
 // =============================================================================
 // END SECTION: Cart Update Logic
@@ -176,15 +166,10 @@ if ($existing) {
 // DESCRIPTION: Calculate total items in cart for response
 // =============================================================================
 
-// Get all cart items for this user
-// FUNCTION: $db->select() - Gets all records matching conditions
-$cartItems = $db->select('cafe_cart', ['user_id' => $user_id]);
-
-// Calculate total quantity (sum of all item quantities)
-$cart_count = 0;
-foreach ($cartItems as $cartItem) {
-    $cart_count += $cartItem['quantity'];
-}
+// Get total cart quantity
+$cartRes = mysqli_query($con, "SELECT COALESCE(SUM(quantity),0) AS qty FROM cart WHERE user_id = $user_id");
+$cartRow = $cartRes ? mysqli_fetch_assoc($cartRes) : ['qty' => 0];
+$cart_count = (int)$cartRow['qty'];
 // =============================================================================
 // END SECTION: Cart Count Calculation
 // =============================================================================
@@ -200,7 +185,7 @@ echo json_encode([
     'success' => true,
     'message' => 'Added to cart successfully!',
     'cart_count' => $cart_count,      // Total items (for badge update)
-    'item_name' => $item['name']      // Item name (for message)
+    'item_name' => $item['item_name'] // Item name (for message)
 ]);
 // =============================================================================
 // END SECTION: Success Response

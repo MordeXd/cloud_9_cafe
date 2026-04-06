@@ -20,12 +20,11 @@
  */
 
 // =============================================================================
-// SECTION: Database Configuration Include
-// DESCRIPTION: Includes database config which initializes JsonDB and TokenAuth
+// SECTION: Database Configuration Include (MySQL only)
 // =============================================================================
-include_once '../config/db_config.php'; // JsonDB + TokenAuth
-// Also load MySQL connection for legacy data (admin login fallback)
 include_once '../config/db.php'; // sets $con
+include_once '../config/TokenAuth.php';
+$auth = new TokenAuth();
 
 // Start PHP session so legacy guards (requireUser/requireAdmin) work after login
 if (session_status() === PHP_SESSION_NONE) {
@@ -68,106 +67,43 @@ if (isset($_POST['login_btn'])) {
     $password = $_POST['password']; // User's password (plain text in demo)
     
     // -------------------------------------------------------------------------
-    // STEP 1: Check if it's an ADMIN login (JSON DB)
+    // STEP 1: Fetch user/admin from MySQL users table
     // -------------------------------------------------------------------------
-    $admin = $db->selectOne('cafe_admins', ['email' => $email, 'password' => $password]);
-    
-    // -------------------------------------------------------------------------
-    // STEP 1b: Fallback to MySQL tables if they exist (legacy / hashed passwords)
-    // Guarded by table existence check to avoid fatal errors when table is absent
-    // -------------------------------------------------------------------------
-    if (!$admin && isset($con)) {
-        // Helper to check table existence
-        $hasTable = function($table) use ($con) {
-            $chk = @mysqli_query($con, "SHOW TABLES LIKE '$table'");
-            if ($chk && mysqli_num_rows($chk) > 0) {
-                mysqli_free_result($chk);
-                return true;
-            }
-            if ($chk) { mysqli_free_result($chk); }
-            return false;
-        };
+    $stmt = mysqli_prepare($con, "SELECT * FROM users WHERE email=? LIMIT 1");
+    mysqli_stmt_bind_param($stmt, "s", $email);
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    $row = $res ? mysqli_fetch_assoc($res) : null;
+    mysqli_stmt_close($stmt);
 
-        $candidateTables = ['cafe_admins', 'users', 'cafe_users'];
-        foreach ($candidateTables as $t) {
-            if (!$hasTable($t)) continue;
-            $stmt = mysqli_prepare($con, "SELECT * FROM $t WHERE email=? LIMIT 1");
-            if (!$stmt) continue;
-            mysqli_stmt_bind_param($stmt, "s", $email);
-            mysqli_stmt_execute($stmt);
-            $res = mysqli_stmt_get_result($stmt);
-            $row = $res ? mysqli_fetch_assoc($res) : null;
-            mysqli_stmt_close($stmt);
-            if (!$row) continue;
+    if ($row) {
+        $fullName = $row['full_name'] ?? $row['fullname'] ?? $row['name'] ?? '';
+        $role     = strtolower($row['role'] ?? 'user');
+        $hash     = $row['password'] ?? '';
+        $status   = strtolower($row['status'] ?? 'active');
 
-            // Determine name/role fields
-            $fullName = $row['fullname'] ?? $row['full_name'] ?? $row['name'] ?? 'Admin';
-            $role     = $row['role'] ?? 'admin';
-            $hash     = $row['password'] ?? '';
-            $status   = $row['status'] ?? 'active';
-
-            // Only allow active admin accounts
-            if (strtolower($role) !== 'admin' || strtolower($status) !== 'active') {
-                $row = null;
-                continue;
-            }
-
-            // Password check: supports hashed (bcrypt) and plain text fallback
-            $passOk = password_verify($password, $hash) || hash_equals($hash, $password);
-            if ($passOk) {
-                $admin = [
-                    'id' => $row['id'],
-                    'fullname' => $fullName,
-                    'role' => $role,
-                ];
-                break;
+        $passOk = password_verify($password, $hash) || hash_equals($hash, $password);
+        if ($passOk && $status === 'active') {
+            // Set session + token for compatibility
+            $_SESSION['user_id'] = (int)$row['id'];
+            if ($role === 'admin') {
+                $_SESSION['admin'] = true;
+                $_SESSION['user'] = null;
+                $auth->loginAdmin($row['id'], $fullName ?: 'Admin', 'admin');
+                header("Location: ../admin/dashboard.php");
+                exit();
+            } else {
+                $_SESSION['user'] = true;
+                $_SESSION['admin'] = null;
+                $auth->loginUser($row['id'], $fullName ?: 'User', 'User');
+                header("Location: ../user/dashboard.php");
+                exit();
             }
         }
     }
-    
-    if ($admin) {
-        // Admin found - Set authentication cookie
-        $auth->loginAdmin($admin['id'], $admin['fullname'], $admin['role'] ?? 'admin');
 
-        // Legacy session flags for existing dashboards
-        $_SESSION['admin'] = true;
-        $_SESSION['user'] = null;
-        $_SESSION['user_id'] = $admin['id'];
-        $_SESSION['user_name'] = $admin['fullname'];
-        
-        // Update last login timestamp in JSON DB if present there
-        if ($db->selectOne('cafe_admins', ['id' => $admin['id']])) {
-            $db->update('cafe_admins', ['last_login' => date('Y-m-d H:i:s')], ['id' => $admin['id']]);
-        }
-        
-        // Redirect to admin dashboard
-        header("Location: ../admin/dashboard.php");
-        exit();  // Stop script execution
-    }
-    
-    // -------------------------------------------------------------------------
-    // STEP 2: Check if it's a USER login (cafe_users table)
-    // -------------------------------------------------------------------------
-    $user = $db->selectOne('cafe_users', ['email' => $email, 'password' => $password]);
-    
-    if ($user) {
-        // User found - Set authentication cookie
-        // FUNCTION: $auth->loginUser() - Sets user auth cookie
-        // PARAMETERS: user_id, fullname, role (defaults to 'User')
-        $auth->loginUser($user['id'], $user['fullname'], $user['role'] ?? 'User');
-
-        // Legacy session flags for existing dashboards
-        $_SESSION['user'] = true;
-        $_SESSION['admin'] = null;
-        $_SESSION['user_id'] = $user['id'];
-        
-        // Redirect to user dashboard
-        header("Location: ../user/dashboard.php");
-        exit();
-    } else {
-        // No match found - Invalid credentials
-        $login_error = "Invalid email or password";  // Error message to display
-    }
+    // No match found - Invalid credentials
+    $login_error = "Invalid email or password";
 }
 // =============================================================================
 // END SECTION: Login Form Processing

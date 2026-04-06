@@ -149,4 +149,93 @@ if ($db->count('cafe_users') === 0) {
 // =============================================================================
 // END SECTION: Default User Initialization
 // =============================================================================
+
+// =============================================================================
+// SECTION: Default Menu Items Initialization
+// DESCRIPTION: Seed homepage/menu with sample items so "Popular Picks" and admin
+//              tools are not empty on first run.
+// =============================================================================
+if ($db->count('menu_items') === 0) {
+    $sampleMenu = [
+        [
+            'name' => 'Signature Cappuccino',
+            'category' => 'Coffee',
+            'description' => 'Double-shot espresso with velvety steamed milk and silky microfoam.',
+            'price' => 169,
+            'image' => 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800',
+            'featured' => 1,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Classic Cold Brew',
+            'category' => 'Cold Coffee',
+            'description' => '16-hour steeped Arabica served over crystal clear ice.',
+            'price' => 189,
+            'image' => 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=800',
+            'featured' => 1,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Hazelnut Latte',
+            'category' => 'Flavored Coffee',
+            'description' => 'Espresso, steamed milk, and roasted hazelnut syrup topped with crema.',
+            'price' => 199,
+            'image' => 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800',
+            'featured' => 1,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Belgian Chocolate Frappe',
+            'category' => 'Blended',
+            'description' => 'Rich cocoa, espresso shot, and whipped cream swirl.',
+            'price' => 229,
+            'image' => 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=800',
+            'featured' => 1,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Avocado Toast',
+            'category' => 'Breakfast',
+            'description' => 'Sourdough topped with smashed avocado, cherry tomatoes, and feta.',
+            'price' => 149,
+            'image' => 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800',
+            'featured' => 0,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Blueberry Cheesecake',
+            'category' => 'Dessert',
+            'description' => 'Creamy cheesecake with blueberry compote on a buttery crust.',
+            'price' => 179,
+            'image' => 'https://images.unsplash.com/photo-1505253758473-96b7015fcd40?w=800',
+            'featured' => 0,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Pesto Chicken Panini',
+            'category' => 'Sandwiches',
+            'description' => 'Grilled ciabatta with basil pesto, grilled chicken, and mozzarella.',
+            'price' => 209,
+            'image' => 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800',
+            'featured' => 0,
+            'availability' => 'Available'
+        ],
+        [
+            'name' => 'Matcha Lemonade',
+            'category' => 'Refreshers',
+            'description' => 'Ceremonial grade matcha shaken with zesty lemonade.',
+            'price' => 159,
+            'image' => 'https://images.unsplash.com/photo-1510626176961-4b37d0b4e904?w=800',
+            'featured' => 0,
+            'availability' => 'Available'
+        ],
+    ];
+
+    foreach ($sampleMenu as $item) {
+        $db->insert('menu_items', $item);
+    }
+}
+// =============================================================================
+// END SECTION: Default Menu Items Initialization
+// =============================================================================
 ?>

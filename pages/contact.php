@@ -1,5 +1,5 @@
 <?php
-require_once '../config/db_config.php';
+require_once '../config/db.php';
 
 // Process form submission
 $success = '';
@@ -28,8 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'created_at' => date('Y-m-d H:i:s')
         ];
         
-        $db->insert('contact_messages', $messageData);
-        $success = "Thank you for your message! We'll get back to you soon.";
+        $stmt = mysqli_prepare($con, "INSERT INTO contact_messages (full_name, email, subject, message) VALUES (?, ?, ?, ?)");
+        mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $subject, $message);
+        if (mysqli_stmt_execute($stmt)) {
+            $success = "Thank you for your message! We'll get back to you soon.";
+        } else {
+            $error = "Failed to submit your message. Please try again.";
+        }
+        mysqli_stmt_close($stmt);
         
         // Clear form after successful submission
         $_POST = [];

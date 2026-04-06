@@ -18,12 +18,15 @@
  */
 
 // =============================================================================
-// SECTION: Database & Authentication Include
-// DESCRIPTION: Include config to access TokenAuth instance
+// SECTION: Authentication Include (TokenAuth only)
 // =============================================================================
-require_once '../config/db_config.php';
+require_once '../config/TokenAuth.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$auth = new TokenAuth();
 // =============================================================================
-// END SECTION: Database & Authentication Include
+// END SECTION: Authentication Include
 // =============================================================================
 
 // =============================================================================

@@ -1,5 +1,10 @@
 <?php
-include_once '../config/db_config.php';
+include_once '../config/db.php';
+include_once '../config/TokenAuth.php';
+$auth = new TokenAuth();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 $title = "Register - Cloud 9 Cafe";
 
 // Registration processing
@@ -16,29 +21,21 @@ if (isset($_POST['reg_btn'])) {
     $token = uniqid();
     
     // Check if email already exists
-    $existingUser = $db->selectOne('cafe_users', ['email' => $email]);
-    if ($existingUser) {
+    $emailSafe = mysqli_real_escape_string($con, $email);
+    $check = mysqli_query($con, "SELECT id FROM users WHERE email = '$emailSafe' LIMIT 1");
+    if ($check && mysqli_num_rows($check) > 0) {
         $register_error = "Email already registered. Please use a different email.";
     } else {
-        // Insert user into JSON database
-        $userData = [
-            'fullname' => $fullname,
-            'email' => $email,
-            'password' => $password,
-            'gender' => $gender,
-            'mobile' => $phone,
-            'profile_picture' => null,
-            'address' => $address,
-            'reward_points' => 0,
-            'status' => 'Active',
-            'role' => 'User',
-            'token' => $token
-        ];
-        
-        $newUserId = $db->insert('cafe_users', $userData);
-        
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $stmt = mysqli_prepare($con, "INSERT INTO users (full_name, email, password, role, status, mobile) VALUES (?, ?, ?, 'user', 'active', ?)");
+        mysqli_stmt_bind_param($stmt, "ssss", $fullname, $email, $hash, $phone);
+        $ok = mysqli_stmt_execute($stmt);
+        $newUserId = $ok ? mysqli_insert_id($con) : null;
+        mysqli_stmt_close($stmt);
+
         if ($newUserId) {
-            // Set cookie for automatic login after registration
+            $_SESSION['user'] = true;
+            $_SESSION['user_id'] = $newUserId;
             $auth->loginUser($newUserId, $fullname, 'User');
             header("Location: ../user/dashboard.php");
             exit();
