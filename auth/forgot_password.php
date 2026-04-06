@@ -1,48 +1,39 @@
 <?php
-include '../config/db.php';
-include '../includes/mailer.php';
-$env = loadEnv(__DIR__ . '/../.env');
-$pageTitle = 'Forgot Password - Cloud 9 Cafe';
-
-$message = '';
-$messageType = '';
-
-if (isset($_POST['reset_btn'])) {
-    $email = cleanInput($_POST['email']);
-    $userQuery = mysqli_query($con, "SELECT id, full_name FROM users WHERE email='$email' LIMIT 1");
-    if ($userQuery && mysqli_num_rows($userQuery) === 1) {
-        $user = mysqli_fetch_assoc($userQuery);
-        $token = bin2hex(random_bytes(32));
-        $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
-        mysqli_query($con, "UPDATE users SET reset_token='$token', reset_expires='$expires' WHERE id=" . (int)$user['id']);
-
-        $resetLink = ($env['APP_URL'] ?? 'http://localhost/cloud_9_cafe') . '/auth/reset_password.php?token=' . $token;
-        $body = '<p>Hello ' . htmlspecialchars($user['full_name']) . ',</p><p>We received a request to reset your password. Click the link below to set a new password:</p><p><a href="' . $resetLink . '">' . $resetLink . '</a></p><p>If you did not request this, please ignore this email.</p>';
-        sendAppMail($email, 'Reset your Cloud 9 Cafe password', $body);
-        $message = 'Reset link sent to your email address.';
-        $messageType = 'success';
-    } else {
-        $message = 'If the email exists, a reset link will be sent.';
-        $messageType = 'info';
-    }
-}
-
-include '../includes/header.php';
+$title = "Forgot Password- Cloud9 Cafe";
+ob_start();
 ?>
 <div class="container">
-    <div class="content-card form-shell">
-        <h1 class="h3 mb-3">Forgot Password</h1>
-        <?php if ($message !== ''): ?>
-            <div class="alert alert-<?= $messageType ?>"><?= $message ?></div>
-        <?php endif; ?>
-        <form method="post" action="">
-            <div class="mb-3">
-                <label class="form-label">Registered Email</label>
-                <input type="text" name="email" class="form-control" data-validation="required email">
-                <span id="email_error"></span>
+    <div class="row justify-content-center fade-in-up">
+        <div class="col-md-6 col-lg-5">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold" style="color: #667eea;">
+                            Forgot Password?
+                        </h2>
+                        <p class="text-muted">Enter your email to reset your password.</p>
+                    </div>
+
+                    <form action="verify_otp.php" method="POST">
+                        <div class="mb-4">
+                            <label for="email" class="form-label fw-semibold">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required data-validation="required email">
+                            <span id="email_error" class="text-danger small"></span>
+                        </div>
+
+                        <button type="submit" class="btn btn-gradient w-100 btn-lg mb-3">Send Reset Link</button>
+
+                        <div class="text-center">
+                            <p class="text-muted mb-0">Remember your password? <a href="login.php" class="text-decoration-none fw-semibold" style="color: #667eea;">Login</a></p>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <button type="submit" name="reset_btn" class="btn btn-cafe w-100">Send Reset Link</button>
-        </form>
+        </div>
     </div>
 </div>
-<?php include '../includes/footer.php'; ?>
+
+<?php
+$content = ob_get_clean();
+include '../includes/layout.php';
+?>

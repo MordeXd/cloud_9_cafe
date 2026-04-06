@@ -1,0 +1,198 @@
+/**
+ * Cloud 9 Cafe - Public Layout Styles
+ * Styles for the main public layout (includes/layout.php)
+ * This file contains all layout-specific styles for navbar, footer, and common components
+ */
+
+/* ============================================
+   LAYOUT STRUCTURE
+   Base layout styles for page structure
+   ============================================ */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* ============================================
+   NAVBAR COMPONENTS
+   Styles for navigation bar elements
+   ============================================ */
+
+/* Navbar Avatar - User profile image in navbar */
+.nav-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--cafe-accent);
+}
+
+/* Cart Badge - Item count indicator on cart icon */
+.cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--cafe-accent);
+    color: var(--cafe-primary-dark);
+    font-size: 0.65rem;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mobile Menu Button - Hamburger toggle for responsive */
+.navbar-toggler {
+    border: none;
+    padding: 0.5rem;
+}
+
+.navbar-toggler:focus {
+    box-shadow: none;
+}
+
+/* ============================================
+   NAVIGATION LINK EFFECTS
+   Hover and active states for nav links
+   ============================================ */
+
+/* Active Link Indicator - Underline animation on hover/active */
+.nav-link {
+    position: relative;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--cafe-primary);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-link:hover::after,
+.nav-link.active::after {
+    width: 60%;
+}
+
+/* ============================================
+   DROPDOWN STYLING
+   Custom styles for Bootstrap dropdowns
+   ============================================ */
+
+/* Dropdown Menu Container */
+.dropdown-menu {
+    border: none;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 0.5rem;
+}
+
+/* Dropdown Menu Items */
+.dropdown-item {
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: rgba(107, 79, 75, 0.05);
+    color: var(--cafe-primary);
+}
+
+/* ============================================
+   FOOTER STYLING
+   Main footer section styles
+   ============================================ */
+
+/* Footer Container */
+.main-footer {
+    background: var(--bg-dark);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 4rem 0 2rem;
+}
+
+/* Footer Links */
+.main-footer a {
+    color: rgba(255, 255, 255, 0.7);
+    transition: color 0.3s ease;
+}
+
+.main-footer a:hover {
+    color: var(--cafe-accent);
+}
+
+/* Footer Brand Logo */
+.footer-brand {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: white !important;
+}
+
+/* Footer Section Titles */
+.footer-title {
+    color: white;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+}
+
+/* ============================================
+   SOCIAL LINKS
+   Social media icon buttons in footer
+   ============================================ */
+
+/* Social Links Container */
+.social-links {
+    display: flex;
+    gap: 0.75rem;
+}
+
+/* Social Link Buttons - Hover effect on social icons */
+.social-links a {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.social-links a:hover {
+    background: var(--cafe-accent);
+    color: var(--cafe-primary-dark);
+    transform: translateY(-3px);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   Helper classes for common styling needs
+   ============================================ */
+
+/* Fixed Navbar Spacer - Creates space below fixed navbar */
+.navbar-spacer {
+    height: var(--navbar-height);
+}
+
+/* Text Accent Color */
+.text-accent {
+    color: var(--cafe-accent) !important;
+}
+
+/* Background Gradient Primary */
+.bg-gradient-primary {
+    background: var(--gradient-primary) !important;
+}

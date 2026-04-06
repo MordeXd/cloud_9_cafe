@@ -1,251 +1,153 @@
 $(document).ready(function () {
-  function getErrorField(field) {
-    var errorSelector = field.data("error");
-    var errorField = errorSelector ? $(errorSelector) : $();
-
-    if (!errorField.length) {
-      var fieldName = field.attr("name") || "";
-      errorField = field.closest("form").find("#" + fieldName + "_error");
-    }
-
-    if (!errorField.length) {
-      errorField = field.next("small");
-    }
-
-    if (!errorField.length) {
-      errorField = $("<small></small>");
-      field.after(errorField);
-    }
-
-    errorField.addClass("small text-danger");
-    return errorField;
-  }
-
-  function hasRule(rules, name) {
-    return rules.indexOf(name.toLowerCase()) !== -1;
-  }
-
+  
   function validateInput(input) {
     var field = $(input);
-    var validationType = (field.data("validation") || "")
-      .toString()
-      .toLowerCase();
+    var value = field.val() || "";
+    var errorSelector = field.data("error-selector") || "#" + field.attr("name") + "_error";
+    var errorfield = $(errorSelector);
+    var validationType = field.data("validation") || "";
+    var minLength = field.data("min") || 0;
+    var maxLength = field.data("max") || 9999;
+    var fileSize = field.data("filesize") || 0;
+    var fileType = field.data("filetype") || "";
+    let errorMessage = "";
+    var isFileInput = field.attr("type") === "file";
+    var isCheckbox = field.attr("type") === "checkbox";
+    var fieldId = field.attr("id");
 
-    var rules = validationType
-      .split(",")
-      .map(function (rule) {
-        return rule.trim();
-      })
-      .filter(function (rule) {
-        return rule !== "";
-      });
-
-    // Fall back to native HTML constraints when data-validation is not provided.
-    if (field.prop("required") && !hasRule(rules, "required")) {
-      rules.push("required");
+    if (!validationType) return true;
+    
+    // SKIP confirmPassword validation - handled directly in register page
+    if (fieldId === "confirmPassword") {
+      return true;
     }
 
-    var fieldTag = (field.prop("tagName") || "").toLowerCase();
-    if (fieldTag === "select" && !hasRule(rules, "select")) {
-      rules.push("select");
-    }
-
-    var nativeType = (field.attr("type") || "").toLowerCase();
-    if (nativeType === "email" && !hasRule(rules, "email")) {
-      rules.push("email");
-    }
-    if (
-      (nativeType === "number" || fieldTag === "input") &&
-      !hasRule(rules, "number") &&
-      field.attr("step") !== undefined &&
-      nativeType === "number"
-    ) {
-      rules.push("number");
-    }
-
-    var value = field.val() ? field.val().toString().trim() : "";
-    var minLength = Number(field.data("min") || field.attr("minlength") || 0);
-    var maxLength = Number(
-      field.data("max") || field.attr("maxlength") || 9999,
-    );
-    var minValue = Number(field.attr("min"));
-    var maxValue = Number(field.attr("max"));
-    var fileSizeMB = Number(field.data("filesize") || 0);
-    var fileType = (field.data("filetype") || "").toString().toLowerCase();
-    var errorField = getErrorField(field);
-    var errorMessage = "";
-
-    var inputType = (field.attr("type") || "").toLowerCase();
-    var isFileInput = inputType === "file";
-    var isCheckbox = inputType === "checkbox";
-    var isSelect = field.is("select");
-
-    if (hasRule(rules, "required")) {
-      if (isCheckbox && !field.is(":checked")) {
-        errorMessage = "This field is required.";
-      } else if (
-        isFileInput &&
-        (!field[0].files || field[0].files.length === 0)
-      ) {
-        errorMessage = "Please select a file to upload.";
-      } else if (!isFileInput && (value === "" || value === null)) {
+    // Required field validation
+    if (validationType.includes("required")) {
+      if (isCheckbox) {
+        if (!field.is(":checked")) {
+          errorMessage = "You must accept the terms and conditions.";
+        }
+      } else if (isFileInput) {
+        if (!field[0].files || field[0].files.length === 0) {
+          errorMessage = "Please select a file to upload.";
+        }
+      } else if ($.trim(value) === "") {
         errorMessage = "This field is required.";
       }
     }
 
-    if (
-      !errorMessage &&
-      hasRule(rules, "select") &&
-      (value === "" || value === "0" || value === null)
-    ) {
-      errorMessage = "Please select an option.";
-    }
-
-    if (!errorMessage && !isFileInput && !isSelect && value !== "") {
-      if (hasRule(rules, "min") && value.length < minLength) {
-        errorMessage =
-          "This field must be at least " + minLength + " characters long.";
+    // Only continue if no error and has value
+    if (!errorMessage && $.trim(value) !== "") {
+      
+      // Minimum length
+      if (validationType.includes("min") && value.length < minLength) {
+        // Special message for phone number field
+        if (fieldId === "phone" || field.attr("name") === "phone") {
+          errorMessage = `Phone number must be ${minLength} digits long.`;
+        } else {
+          errorMessage = `This field must be at least ${minLength} characters long.`;
+        }
       }
 
-      if (!errorMessage && hasRule(rules, "max") && value.length > maxLength) {
-        errorMessage =
-          "This field must be at most " + maxLength + " characters long.";
+      // Maximum length
+      if (validationType.includes("max") && value.length > maxLength) {
+        errorMessage = `This field must be ${maxLength} characters long.`;
       }
 
-      if (!errorMessage && hasRule(rules, "alphabetic")) {
-        var alphabetRegex = /^[a-zA-Z\s]+$/;
-        if (!alphabetRegex.test(value)) {
+      // Alphabetic
+      if (validationType.includes("alphabetic")) {
+        var alphabet_regex = /^[a-zA-Z\s]+$/;
+        if (!alphabet_regex.test(value)) {
           errorMessage = "Please enter alphabetic characters only.";
         }
       }
 
-      if (!errorMessage && hasRule(rules, "email")) {
-        var emailRegex = /^[\w-.]+@([\w-]+\.)+[\w]{2,}$/;
+      // Email
+      if (validationType.includes("email")) {
+        var emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w]{2,4}$/;
         if (!emailRegex.test(value)) {
           errorMessage = "Please enter a valid email address.";
         }
       }
 
-      if (!errorMessage && hasRule(rules, "number")) {
-        var numberRegex = /^\d+(\.\d+)?$/;
+      // Number
+      if (validationType.includes("number")) {
+        var numberRegex = /^[0-9]+$/;
         if (!numberRegex.test(value)) {
-          errorMessage = "Please enter a valid number.";
+          errorMessage = "Please enter only numbers.";
         }
       }
 
-      if (!errorMessage && nativeType === "number" && value !== "") {
-        var numericValue = Number(value);
-        if (!Number.isNaN(minValue) && numericValue < minValue) {
-          errorMessage =
-            "Value must be greater than or equal to " + minValue + ".";
-        }
-        if (
-          !errorMessage &&
-          !Number.isNaN(maxValue) &&
-          numericValue > maxValue
-        ) {
-          errorMessage =
-            "Value must be less than or equal to " + maxValue + ".";
-        }
-      }
-
-      if (!errorMessage && hasRule(rules, "strongpassword")) {
-        var passwordRegex =
-          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+      // Strong password
+      if (validationType.includes("strongPassword")) {
+        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@$!%*?&])[A-Za-z0-9@$!%*?&]{8,}$/;
         if (!passwordRegex.test(value)) {
-          errorMessage =
-            "Password must be at least 8 characters and include upper, lower, number, and special character.";
+          errorMessage = "Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.";
         }
       }
 
-      if (!errorMessage && hasRule(rules, "confirmpassword")) {
-        var confirmPassword = $(
-          "#" + (field.attr("name") || "") + "_confirm",
-        ).val();
-        if (value !== confirmPassword) {
-          errorMessage = "Passwords do not match.";
+      // Select dropdown
+      if (validationType.includes("select")) {
+        if ($.trim(value) === "" || value === "0") {
+          errorMessage = "Please select an option.";
         }
       }
     }
 
-    if (
-      !errorMessage &&
-      isFileInput &&
-      field[0].files &&
-      field[0].files.length > 0
-    ) {
-      var files = field[0].files;
+    // File validations
+    if (isFileInput && field[0].files && field[0].files.length > 0) {
+      var file = field[0].files[0];
 
-      for (var i = 0; i < files.length; i++) {
-        var file = files[i];
-
-        if (hasRule(rules, "filesize") && fileSizeMB > 0) {
-          if (file.size > fileSizeMB * 1024 * 1024) {
-            errorMessage = "File size must be less than " + fileSizeMB + " MB.";
-            break;
-          }
+      if (validationType.includes("fileSize")) {
+        if (file.size > fileSize * 1024) {
+          errorMessage = `File size must be less than ${fileSize}KB.`;
         }
+      }
 
-        if (!errorMessage && hasRule(rules, "filetype") && fileType !== "") {
-          var fileExtension = file.name.split(".").pop().toLowerCase();
-          var allowedExtensions = fileType.split(",").map(function (ext) {
-            return ext.trim().replace(".", "");
-          });
-          if (allowedExtensions.indexOf(fileExtension) === -1) {
-            errorMessage = "Allowed file types: " + fileType + ".";
-            break;
-          }
+      if (validationType.includes("fileType") && !errorMessage) {
+        var fileExtension = file.name.split(".").pop().toLowerCase();
+        var allowedExtensions = fileType.split(",").map(function(ext) { 
+          return ext.trim().toLowerCase(); 
+        });
+        if (allowedExtensions.indexOf(fileExtension) === -1) {
+          errorMessage = `File type must be ${fileType}.`;
         }
       }
     }
 
+    // Show/hide error
     if (errorMessage) {
-      errorField.text(errorMessage).show();
+      errorfield.text(errorMessage).show();
       field.addClass("is-invalid").removeClass("is-valid");
+      errorfield.addClass("small text-danger");
       return false;
+    } else {
+      errorfield.text("").hide();
+      field.removeClass("is-invalid").addClass("is-valid");
+      return true;
     }
-
-    errorField.text("").hide();
-    field.removeClass("is-invalid").addClass("is-valid");
-    return true;
   }
-
-  $(document).on("input change", "input, textarea, select", function () {
+  
+  // Input/change validation - SKIP confirmPassword
+  $(document).on("input change", "input:not(#confirmPassword), textarea, select", function () {
     validateInput(this);
   });
 
+  // Form submit - SKIP confirmPassword validation
   $(document).on("submit", "form", function (e) {
     var isValid = true;
-    var firstInvalidField = null;
-
-    $(this)
-      .find("input, textarea, select")
-      .each(function () {
-        var fieldValid = validateInput(this);
-        if (!fieldValid) {
-          isValid = false;
-          if (!firstInvalidField) {
-            firstInvalidField = this;
-          }
-        }
-      });
-
+    var $form = $(this);
+    
+    $form.find("input:not(#confirmPassword), textarea, select").each(function () {
+      if (!validateInput(this)) {
+        isValid = false;
+      }
+    });
+    
     if (!isValid) {
       e.preventDefault();
-
-      var parentModal = $(this).closest(".modal");
-      if (parentModal.length && typeof bootstrap !== "undefined") {
-        var modalInstance = bootstrap.Modal.getOrCreateInstance(parentModal[0]);
-        modalInstance.show();
-      }
-
-      if (firstInvalidField) {
-        firstInvalidField.focus();
-      }
-
       return false;
     }
-
-    return true;
   });
 });

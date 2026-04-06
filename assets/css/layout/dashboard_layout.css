@@ -1,0 +1,325 @@
+/**
+ * Cloud 9 Cafe - User Dashboard Layout Styles
+ * Styles for the user dashboard layout (includes/dashboard_layout.php)
+ * This file contains all layout-specific styles for user dashboard sidebar, header, and components
+ */
+
+/* ============================================
+   DASHBOARD LAYOUT STRUCTURE
+   Main wrapper and container styles
+   ============================================ */
+.dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ============================================
+   SIDEBAR STYLES
+   Left sidebar navigation for user dashboard
+   ============================================ */
+
+/* Sidebar Container - Fixed left sidebar */
+.dashboard-sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-white);
+    border-right: 1px solid #E5E8E8;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    transition: transform var(--transition-normal);
+}
+
+/* Sidebar Header - Logo area */
+.sidebar-header {
+    padding: var(--space-lg);
+    border-bottom: 1px solid #E5E8E8;
+}
+
+/* Brand Link - Logo and site name */
+.brand-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--cafe-primary);
+    text-decoration: none;
+}
+
+.brand-link:hover {
+    color: var(--cafe-primary-dark);
+}
+
+/* User Profile Summary - Avatar and name in sidebar */
+.user-profile-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border-bottom: 1px solid #E5E8E8;
+}
+
+/* User Avatar - Large avatar in sidebar */
+.user-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--cafe-accent);
+}
+
+/* User Info Text */
+.user-info h6 {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.user-info small {
+    color: var(--text-light);
+}
+
+/* ============================================
+   SIDEBAR NAVIGATION
+   Navigation menu in sidebar
+   ============================================ */
+
+/* Sidebar Navigation Container */
+.sidebar-nav {
+    flex: 1;
+    padding: var(--space-md);
+    overflow-y: auto;
+}
+
+/* Navigation Section Headers */
+.sidebar-nav .nav-section {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    margin: var(--space-lg) 0 var(--space-sm) var(--space-md);
+    font-weight: 600;
+}
+
+/* Navigation Links */
+.sidebar-nav .nav-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    margin-bottom: var(--space-xs);
+    border-radius: var(--radius-md);
+    color: var(--text-medium);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-nav .nav-link i {
+    width: 24px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+/* Navigation Link Hover Effect */
+.sidebar-nav .nav-link:hover {
+    background: rgba(107, 79, 75, 0.05);
+    color: var(--cafe-primary);
+}
+
+/* Navigation Link Active State */
+.sidebar-nav .nav-link.active {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.sidebar-nav .nav-link.active i {
+    color: white;
+}
+
+/* Sidebar Footer - Logout button area */
+.sidebar-footer {
+    padding: var(--space-lg);
+    border-top: 1px solid #E5E8E8;
+}
+
+/* ============================================
+   MAIN CONTENT AREA
+   Right side content wrapper
+   ============================================ */
+
+/* Main Content Container */
+.dashboard-main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    background: var(--bg-cream);
+    min-height: 100vh;
+    transition: margin var(--transition-normal);
+}
+
+/* ============================================
+   DASHBOARD HEADER
+   Top header bar with search and actions
+   ============================================ */
+
+/* Header Container */
+.dashboard-header {
+    background: var(--bg-white);
+    padding: var(--space-md) var(--space-xl);
+    border-bottom: 1px solid #E5E8E8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* Header Search Box */
+.header-search {
+    position: relative;
+    max-width: 300px;
+}
+
+.header-search input {
+    padding-left: 40px;
+    border-radius: var(--radius-full);
+    background: var(--bg-cream);
+    border: none;
+}
+
+.header-search i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+}
+
+/* Header Actions Container */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+/* Header Buttons - Notification, cart icons */
+.header-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: var(--bg-cream);
+    color: var(--text-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all var(--transition-fast);
+}
+
+.header-btn:hover {
+    background: var(--cafe-primary);
+    color: white;
+}
+
+/* Header Badge - Notification count */
+.header-btn .badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: var(--cafe-accent);
+    color: var(--cafe-primary-dark);
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+}
+
+/* ============================================
+   CONTENT AREA
+   Main dashboard content padding
+   ============================================ */
+.dashboard-content {
+    padding: var(--space-xl);
+}
+
+/* ============================================
+   MOBILE COMPONENTS
+   Mobile-specific toggle button and overlay
+   ============================================ */
+
+/* Mobile Sidebar Toggle Button - Floating action button */
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    bottom: var(--space-lg);
+    right: var(--space-lg);
+    z-index: 1001;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-lg);
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+/* Mobile Overlay - Dark overlay behind sidebar */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   Mobile and tablet breakpoints
+   ============================================ */
+
+/* Tablet Breakpoint - Hide sidebar, show toggle */
+@media (max-width: 991.98px) {
+    .dashboard-sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .dashboard-sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .dashboard-main {
+        margin-left: 0;
+    }
+    
+    .sidebar-toggle {
+        display: flex;
+    }
+    
+    .sidebar-overlay.show {
+        display: block;
+    }
+}
+
+/* Mobile Breakpoint - Compact padding */
+@media (max-width: 767.98px) {
+    .dashboard-content {
+        padding: var(--space-md);
+    }
+    
+    .dashboard-header {
+        padding: var(--space-md);
+    }
+    
+    .header-search {
+        display: none;
+    }
+}

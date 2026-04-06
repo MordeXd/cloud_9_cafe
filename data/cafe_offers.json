@@ -1,0 +1,50 @@
+[
+    {
+        "id": 1,
+        "offer_code": "SAVE20",
+        "title": "Save 20%",
+        "description": "Get 20% off on orders above $50",
+        "discount_type": "Percentage",
+        "discount_value": 20,
+        "min_order_amount": 50,
+        "max_discount": 20,
+        "valid_from": "2026-01-01",
+        "valid_until": "2026-12-31",
+        "usage_limit": 100,
+        "usage_count": 0,
+        "status": "Active",
+        "created_at": "2026-02-27 19:00:40"
+    },
+    {
+        "id": 2,
+        "offer_code": "FIRST50",
+        "title": "First Order Discount",
+        "description": "Flat $5 off on your first order",
+        "discount_type": "Fixed",
+        "discount_value": 5,
+        "min_order_amount": 0,
+        "max_discount": null,
+        "valid_from": "2026-01-01",
+        "valid_until": "2026-12-31",
+        "usage_limit": null,
+        "usage_count": 0,
+        "status": "Active",
+        "created_at": "2026-02-27 19:00:40"
+    },
+    {
+        "id": 3,
+        "offer_code": "COFFEE10",
+        "title": "Coffee Lovers",
+        "description": "10% off on all coffee items",
+        "discount_type": "Percentage",
+        "discount_value": 10,
+        "min_order_amount": 0,
+        "max_discount": 10,
+        "valid_from": "2026-01-01",
+        "valid_until": "2026-12-31",
+        "usage_limit": null,
+        "usage_count": 0,
+        "status": "Active",
+        "created_at": "2026-02-27 19:00:40"
+    }
+]

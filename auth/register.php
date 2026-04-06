@@ -1,122 +1,367 @@
 <?php
-include '../config/db.php';
-include '../includes/mailer.php';
-$env = loadEnv(__DIR__ . '/../.env');
-$pageTitle = 'Register - Cloud 9 Cafe';
+include_once '../config/db_config.php';
+$title = "Register - Cloud 9 Cafe";
 
-$message = '';
-$messageType = '';
-$uploadDir = __DIR__ . '/../' . rtrim($env['UPLOAD_PATH'] ?? 'uploads/', '/') . '/';
-
-if (isset($_POST['register_btn'])) {
-    $firstName = cleanInput($_POST['firstName']);
-    $lastName = cleanInput($_POST['lastName']);
-    $fullName = $firstName . ' ' . $lastName;
-    $email = cleanInput($_POST['email']);
-    $phone = cleanInput($_POST['phone']);
+// Registration processing
+if (isset($_POST['reg_btn'])) {
+    $fname = $_POST['firstName'];
+    $lname = $_POST['lastName'];
+    $email = $_POST['email'];
+    $phone = $_POST['phone'];
     $password = $_POST['password'];
-    $gender = cleanInput($_POST['gender']);
-
-    $profileImageName = null;
-    if (!empty($_FILES['profile_picture']['name'])) {
-        $profileImageName = time() . '_' . basename($_FILES['profile_picture']['name']);
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        move_uploaded_file($_FILES['profile_picture']['tmp_name'], $uploadDir . $profileImageName);
-    }
-
-    $checkUser = mysqli_query($con, "SELECT id FROM users WHERE email='$email'");
-
-    if (mysqli_num_rows($checkUser) > 0) {
-        $message = 'Email already exists. Please use another email.';
-        $messageType = 'danger';
+    $gender = $_POST['gender'];
+    $address = "Rajkot";
+    
+    $fullname = $fname . " " . $lname;
+    $token = uniqid();
+    
+    // Check if email already exists
+    $existingUser = $db->selectOne('cafe_users', ['email' => $email]);
+    if ($existingUser) {
+        $register_error = "Email already registered. Please use a different email.";
     } else {
-        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-        $activationToken = bin2hex(random_bytes(32));
-        $insertQuery = "INSERT INTO users (full_name, email, phone, password, gender, profile_image, role, status, activation_token, is_verified) 
-                        VALUES ('$fullName', '$email', '$phone', '$hashedPassword', '$gender', '$profileImageName', 'user', 'inactive', '$activationToken', 0)";
-
-        if (mysqli_query($con, $insertQuery)) {
-            $activationLink = ($env['APP_URL'] ?? 'http://localhost/cloud_9_cafe') . '/auth/activate.php?token=' . $activationToken;
-            $body = '<p>Hi ' . htmlspecialchars($fullName) . ',</p><p>Thanks for registering at Cloud 9 Cafe. Please click the link below to activate your account:</p><p><a href="' . $activationLink . '">' . $activationLink . '</a></p>';
-            sendAppMail($email, 'Activate your Cloud 9 Cafe account', $body);
-            $message = 'Registration successful. Check your email for the activation link.';
-            $messageType = 'success';
+        // Insert user into JSON database
+        $userData = [
+            'fullname' => $fullname,
+            'email' => $email,
+            'password' => $password,
+            'gender' => $gender,
+            'mobile' => $phone,
+            'profile_picture' => null,
+            'address' => $address,
+            'reward_points' => 0,
+            'status' => 'Active',
+            'role' => 'User',
+            'token' => $token
+        ];
+        
+        $newUserId = $db->insert('cafe_users', $userData);
+        
+        if ($newUserId) {
+            // Set cookie for automatic login after registration
+            $auth->loginUser($newUserId, $fullname, 'User');
+            header("Location: ../user/dashboard.php");
+            exit();
         } else {
-            $message = 'Registration failed. Please try again.';
-            $messageType = 'danger';
+            $register_error = "Error in registration";
         }
     }
 }
 
-include '../includes/header.php';
+ob_start();
 ?>
-<div class="container">
-    <div class="content-card form-shell">
-        <h1 class="h3 mb-3">Create Account</h1>
-        <?php if ($message !== ''): ?>
-            <div class="alert alert-<?= $messageType ?>"><?= $message ?></div>
-        <?php endif; ?>
-        <form method="post" action="" enctype="multipart/form-data">
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">First Name</label>
-                    <input type="text" name="firstName" class="form-control" data-validation="required min alphabetic max" data-min="2" data-max="20">
-                    <span id="firstName_error"></span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Last Name</label>
-                    <input type="text" name="lastName" class="form-control" data-validation="required min alphabetic max" data-min="2" data-max="20">
-                    <span id="lastName_error"></span>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <!-- Register Card -->
+            <div class="card border-0 shadow-lg animate-fade-in-up">
+                <div class="card-body p-4 p-md-5">
+                    <!-- Header -->
+                    <div class="text-center mb-4">
+                        <div class="mb-3">
+                            <div class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 80px; height: 80px; background: var(--gradient-primary);">
+                                <i class="fas fa-user-plus fa-2x text-white"></i>
+                            </div>
+                        </div>
+                        <h2 class="fw-bold text-primary mb-2">Create Account</h2>
+                        <p class="text-muted mb-0">Join Cloud 9 Cafe and start your coffee journey</p>
+                    </div>
+
+                    <!-- Error Message -->
+                    <?php if (isset($register_error)): ?>
+                    <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <?php echo $register_error; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Registration Form -->
+                    <form action="register.php" method="post" id="regform">
+                        <div class="row g-3">
+                            <!-- First Name -->
+                            <div class="col-md-6">
+                                <label for="firstName" class="form-label fw-medium">First Name</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-user text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control border-start-0 ps-0" id="firstName" name="firstName" 
+                                           placeholder="John" 
+                                           data-validation="required,alphabetic,min" data-min="2">
+                                </div>
+                                <div id="firstName_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Last Name -->
+                            <div class="col-md-6">
+                                <label for="lastName" class="form-label fw-medium">Last Name</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-user text-muted"></i>
+                                    </span>
+                                    <input type="text" class="form-control border-start-0 ps-0" id="lastName" name="lastName" 
+                                           placeholder="Doe" 
+                                           data-validation="required,alphabetic,min" data-min="2">
+                                </div>
+                                <div id="lastName_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Email -->
+                            <div class="col-md-6">
+                                <label for="email" class="form-label fw-medium">Email Address</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-envelope text-muted"></i>
+                                    </span>
+                                    <input type="email" class="form-control border-start-0 ps-0" id="email" name="email" 
+                                           placeholder="john@example.com" 
+                                           data-validation="required,email">
+                                </div>
+                                <div id="email_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Phone -->
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label fw-medium">Phone Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-phone text-muted"></i>
+                                    </span>
+                                    <input type="tel" class="form-control border-start-0 ps-0" id="phone" name="phone" 
+                                           placeholder="1234567890" 
+                                           data-validation="required,number,min" data-min="10" data-max="15">
+                                </div>
+                                <div id="phone_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Gender -->
+                            <div class="col-md-6">
+                                <label for="gender" class="form-label fw-medium">Gender</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-venus-mars text-muted"></i>
+                                    </span>
+                                    <select class="form-select border-start-0 ps-0" id="gender" name="gender" 
+                                            data-validation="required,select">
+                                        <option value="">Select Gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div id="gender_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Password -->
+                            <div class="col-md-6">
+                                <label for="password" class="form-label fw-medium">Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-lock text-muted"></i>
+                                    </span>
+                                    <input type="password" class="form-control border-start-0 ps-0" id="password" name="password" 
+                                           placeholder="Create password" 
+                                           data-validation="required,strongPassword">
+                                    <button type="button" class="btn btn-outline-secondary toggle-password" data-target="#password" tabindex="-1">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div id="password_error" class="invalid-feedback d-block"></div>
+                            </div>
+
+                            <!-- Confirm Password -->
+                            <div class="col-md-6">
+                                <label for="confirmPassword" class="form-label fw-medium">Confirm Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-end-0">
+                                        <i class="fas fa-lock text-muted"></i>
+                                    </span>
+                                    <input type="password" class="form-control border-start-0 ps-0" id="confirmPassword" name="confirmPassword" 
+                                           placeholder="Confirm password">
+                                    <button type="button" class="btn btn-outline-secondary toggle-password" data-target="#confirmPassword" tabindex="-1">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div id="confirmPassword_error" class="invalid-feedback d-block"></div>
+                            </div>
+                        </div>
+
+                        <!-- Terms -->
+                        <div class="mt-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="terms" name="terms" 
+                                       data-validation="required">
+                                <label class="form-check-label text-muted small" for="terms">
+                                    I agree to the <a href="../pages/terms_of_service.php" class="text-primary">Terms of Service</a> and <a href="../pages/privacy_policy.php" class="text-primary">Privacy Policy</a>
+                                </label>
+                                <div id="terms_error" class="invalid-feedback d-block"></div>
+                            </div>
+                        </div>
+
+                        <!-- Submit -->
+                        <button type="submit" name="reg_btn" class="btn btn-primary w-100 btn-lg mt-4">
+                            <i class="fas fa-user-plus me-2"></i>Create Account
+                        </button>
+
+                        <!-- Social Register -->
+                        <div class="text-center mt-4">
+                            <p class="text-muted small mb-3">Or register with</p>
+                            <div class="d-flex gap-2 justify-content-center mb-4">
+                                <button type="button" class="btn btn-outline-secondary btn-icon" style="width: 44px; height: 44px;">
+                                    <i class="fab fa-google"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-icon" style="width: 44px; height: 44px;">
+                                    <i class="fab fa-facebook-f"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-icon" style="width: 44px; height: 44px;">
+                                    <i class="fab fa-apple"></i>
+                                </button>
+                            </div>
+                            
+                            <p class="text-muted mb-0">
+                                Already have an account? 
+                                <a href="login.php" class="text-primary fw-bold">Sign In</a>
+                            </p>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Email</label>
-                <input type="text" name="email" class="form-control" data-validation="required email">
-                <span id="email_error"></span>
+            
+            <!-- Back to Home -->
+            <div class="text-center mt-4 mb-4">
+                <a href="../pages/index.php" class="text-muted text-decoration-none">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Home
+                </a>
             </div>
-            <div class="mb-3">
-                <label class="form-label">Phone Number</label>
-                <input type="text" name="phone" class="form-control" data-validation="required number min max" data-min="10" data-max="10">
-                <span id="phone_error"></span>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Password</label>
-                    <input type="password" id="confirmPassword_confirm" name="password" class="form-control" data-validation="required strongPassword">
-                    <span id="password_error"></span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Confirm Password</label>
-                    <input type="password" id="password" name="confirmPassword" class="form-control" data-validation="required confirmPassword">
-                    <span id="confirmPassword_error"></span>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Gender</label>
-                    <select name="gender" class="form-select" data-validation="required select">
-                        <option value="">Select Gender</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
-                    </select>
-                    <span id="gender_error"></span>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Profile Picture</label>
-                    <input type="file" name="profile_picture" class="form-control" data-validation="required fileSize fileType" data-filesize="2" data-filetype="jpg,jpeg,png">
-                    <span id="profile_picture_error"></span>
-                </div>
-            </div>
-            <div class="mb-3 form-check">
-                <input type="checkbox" class="form-check-input" id="terms" name="terms" data-validation="required">
-                <label class="form-check-label" for="terms">I agree to the terms and conditions</label>
-                <span id="terms_error"></span>
-            </div>
-            <button type="submit" name="register_btn" class="btn btn-cafe w-100">Register</button>
-        </form>
+        </div>
     </div>
 </div>
-<?php include '../includes/footer.php'; ?>
+
+<style>
+    .btn-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    
+    .form-check-input:checked {
+        background-color: var(--cafe-primary);
+        border-color: var(--cafe-primary);
+    }
+    
+    /* Validation styles */
+    .is-valid {
+        border-color: #198754 !important;
+    }
+    
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+    
+    /* Toggle password button styling */
+    .toggle-password {
+        cursor: pointer;
+        z-index: 10;
+    }
+    
+    .toggle-password:hover {
+        background-color: #e9ecef !important;
+    }
+</style>
+
+<script src="../assets/js/jquery.js"></script>
+<script src="../assets/js/validate.js"></script>
+<script>
+    // Toggle password visibility - using vanilla JS for better compatibility
+    document.addEventListener('DOMContentLoaded', function() {
+        var toggleButtons = document.querySelectorAll('.toggle-password');
+        
+        toggleButtons.forEach(function(button) {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                
+                var targetSelector = this.getAttribute('data-target');
+                var input = document.querySelector(targetSelector);
+                var icon = this.querySelector('i');
+                
+                if (input && icon) {
+                    if (input.getAttribute('type') === 'password') {
+                        input.setAttribute('type', 'text');
+                        icon.classList.remove('fa-eye');
+                        icon.classList.add('fa-eye-slash');
+                    } else {
+                        input.setAttribute('type', 'password');
+                        icon.classList.remove('fa-eye-slash');
+                        icon.classList.add('fa-eye');
+                    }
+                }
+            });
+        });
+        
+        // Direct password match validation
+        var passwordField = document.getElementById('password');
+        var confirmField = document.getElementById('confirmPassword');
+        var confirmError = document.getElementById('confirmPassword_error');
+        
+        function checkPasswordMatch() {
+            var pass = passwordField.value;
+            var confirm = confirmField.value;
+            
+            // Always check if confirm has value
+            if (confirm.length > 0) {
+                // Direct string comparison
+                if (pass === confirm) {
+                    // MATCH
+                    confirmError.textContent = '';
+                    confirmError.style.display = 'none';
+                    confirmField.classList.remove('is-invalid');
+                    confirmField.classList.add('is-valid');
+                    return true;
+                } else {
+                    // NO MATCH
+                    confirmError.textContent = 'Passwords do not match.';
+                    confirmError.style.display = 'block';
+                    confirmField.classList.add('is-invalid');
+                    confirmField.classList.remove('is-valid');
+                    return false;
+                }
+            } else {
+                // Empty confirm field
+                confirmError.textContent = '';
+                confirmError.style.display = 'none';
+                confirmField.classList.remove('is-invalid', 'is-valid');
+                return false;
+            }
+        }
+        
+        // Check on input (typing)
+        confirmField.addEventListener('input', checkPasswordMatch);
+        
+        // Check when password changes (if confirm is not empty)
+        passwordField.addEventListener('input', function() {
+            if (confirmField.value.length > 0) {
+                checkPasswordMatch();
+            }
+        });
+        
+        // Check on blur (when leaving the field)
+        confirmField.addEventListener('blur', checkPasswordMatch);
+        
+        // Form submit check
+        document.getElementById('regform').addEventListener('submit', function(e) {
+            var isMatch = checkPasswordMatch();
+            if (!isMatch) {
+                e.preventDefault();
+                confirmField.focus();
+            }
+        });
+    });
+</script>
+
+<?php
+$content = ob_get_clean();
+include '../includes/layout.php';
+?>
