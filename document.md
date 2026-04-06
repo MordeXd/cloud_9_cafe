@@ -1,0 +1,68 @@
+# Cloud 9 Cafe Project Log
+
+## Task
+Build a simple PHP cafe website inspired by the reference project.
+
+## Progress Log
+- Project folder created.
+- Started analysis of reference validation method and project structure.
+- Reference validation method identified: centralized jQuery validation using `data-validation`, `data-min`, `data-max`, `data-filesize`, `data-filetype`.
+- Project structure scaffolded for Cloud 9 Cafe.
+- Validation script copied as baseline to `assets/js/validate.js`.
+- Created base config file: `config/db.php`.
+- Created common auth helper: `includes/auth.php`.
+- Created reusable layout files: `includes/header.php`, `includes/footer.php`.
+- Created global stylesheet: `assets/css/global.css`.
+- Created initial public pages: `index.php`, `menu.php`, `about.php`, `contact.php`.
+- Created initial auth pages: `auth/login.php`, `auth/register.php`.
+- Created initial user dashboard shell: `user/dashboard.php`.
+- Created initial admin dashboard shell: `admin/dashboard.php`.
+- Validation method wired globally through `assets/js/validate.js`.
+- Added user pages with validated forms: `user/profile.php`, `user/reservations.php`, `user/orders.php`, `user/feedback.php`, `user/change_password.php`.
+- Added forgot password page: `auth/forgot_password.php`.
+- Added admin management pages with validated forms: `admin/menu_items.php`, `admin/categories.php`, `admin/reservations.php`, `admin/orders.php`, `admin/users.php`, `admin/feedback.php`, `admin/settings.php`.
+- Added public gallery page: `gallery.php`.
+- Step coverage now includes public pages, auth forms, user dashboard/form pages, and admin dashboard/form pages.
+- Created database schema file: `cloud_9_cafe.sql`.
+- Import attempt via `mysql -u root` failed because local MariaDB root auth is restricted on this machine.
+- Upgraded DB bootstrap in `config/db.php` with session start and `cleanInput()` helper.
+- Extended auth helper with `currentUserId()`.
+- Implemented backend registration logic with password hashing in `auth/register.php`.
+- Implemented backend login logic with password verification and role redirect in `auth/login.php`.
+- Implemented contact form insert logic in `contact.php`.
+- Implemented reservation insert + history listing in `user/reservations.php`.
+- Implemented feedback insert logic in `user/feedback.php`.
+- Added PHP-based schema/regeneration file: `setup_database.php`.
+- This file creates the database, tables, and default cafe settings in PHP.
+- Preferred regeneration path is now PHP setup first, SQL file second.
+- Attempted to run `setup_database.php` via CLI; DB auth still blocked for MySQL root from PHP.
+- Added `logout.php`.
+- Implemented user profile update logic in `user/profile.php`.
+- Implemented password change logic in `user/change_password.php`.
+- Implemented admin category create + list logic in `admin/categories.php`.
+- Implemented admin settings save/update logic in `admin/settings.php`.
+- Added logout links to user/admin sidebars where updated.
+- Updated DB credentials in `config/db.php` to use `cloud9_user` / `cloud9cafe`.
+- Updated `setup_database.php` to the same DB credentials.
+- Implemented user order data fetch in `user/orders.php`.
+- Implemented admin menu item create + list logic in `admin/menu_items.php`.
+- Implemented admin reservation update + list logic in `admin/reservations.php`.
+- Implemented admin order update + list logic in `admin/orders.php`.
+- Implemented admin feedback reply + list logic in `admin/feedback.php`.
+- Implemented admin user update + list logic in `admin/users.php`.
+- Continued option 3 path: coding further while preparing proper DB-user-based setup.
+- Implemented cart system.
+- Added `cart` table creation in `setup_database.php`.
+- Updated `menu.php` with add-to-cart logic and cart entry handling.
+- Created `user/cart.php` with cart listing, quantity update, remove item, and clear cart features.
+- Re-ran PHP setup file successfully after cart schema update.
+- Added reusable sidebars: `includes/user_sidebar.php`, `includes/admin_sidebar.php`.
+- Improved UI polish in global CSS and menu cards.
+- Implemented checkout flow from cart in `user/cart.php`.
+- Implemented cart-to-order conversion by inserting into `orders` and clearing cart.
+- Added dynamic dashboard stats in `user/dashboard.php` and `admin/dashboard.php`.
+- Improved consistent layout reuse by switching to shared sidebar includes.
+- Re-ran setup and performed lightweight end-to-end HTTP checks for homepage, menu page, and login page.
+- Full browser-driven end-to-end GUI testing is still limited by no DISPLAY access from this execution environment.
+- Imported and adapted external theme/layout CSS into `assets/css/global.css`.
+- Updated Cloud 9 Cafe styling to match the provided modern theme system more closely.
