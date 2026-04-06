@@ -12,6 +12,7 @@
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'users' ? 'active' : '' ?>" href="/cloud_9_cafe/admin/users.php">Users</a></li>
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'admin_register' ? 'active' : '' ?>" href="/cloud_9_cafe/admin_register.php">Admin Accounts</a></li>
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'feedback' ? 'active' : '' ?>" href="/cloud_9_cafe/admin/feedback.php">Feedback</a></li>
+        <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'popular_picks' ? 'active' : '' ?>" href="/cloud_9_cafe/admin/popular_picks.php">Popular Picks</a></li>
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'settings' ? 'active' : '' ?>" href="/cloud_9_cafe/admin/settings.php">Settings</a></li>
         <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
     </ul>

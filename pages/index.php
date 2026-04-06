@@ -1,16 +1,54 @@
 <?php
 require_once '../config/db_config.php';
 $title = "Home - Cloud 9 Cafe"; 
-$popular_items = $db->select('menu_items', ['featured' => 1, 'availability' => 'Available'], null, 4);
 
-if (empty($popular_items)) {
-    $popular_items = [
-        ['id' => 1, 'name' => 'Caramel Macchiato', 'price' => 450, 'category' => 'Coffee', 'image' => 'https://images.unsplash.com/photo-1485808191679-5f86510681a2?w=400'],
-        ['id' => 2, 'name' => 'Cappuccino', 'price' => 380, 'category' => 'Coffee', 'image' => 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400'],
-        ['id' => 3, 'name' => 'Chocolate Croissant', 'price' => 280, 'category' => 'Snack', 'image' => 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400'],
-        ['id' => 4, 'name' => 'Cheesecake', 'price' => 420, 'category' => 'Dessert', 'image' => 'https://images.unsplash.com/photo-1524351199678-941a58a3df26?w=400'],
-    ];
+// Popular Picks: priority 1) featured & available, 2) top sellers, 3) random available
+$popular_items = $db->select('menu_items', ['featured' => 1, 'availability' => 'Available'], ['updated_at' => 'DESC'], 4);
+
+if (count($popular_items) < 4) {
+    // Build top sellers list from order items
+    $sales = [];
+    $orderItems = $db->select('cafe_order_items');
+    foreach ($orderItems as $oi) {
+        $mid = $oi['menu_item_id'] ?? null;
+        if (!$mid) continue;
+        $sales[$mid] = ($sales[$mid] ?? 0) + (int)($oi['quantity'] ?? 0);
+    }
+    arsort($sales); // highest quantity first
+
+    // Fetch all available items to pull from
+    $availableItems = $db->select('menu_items', ['availability' => 'Available']);
+    $availableById = [];
+    foreach ($availableItems as $item) {
+        if (!isset($item['id'])) continue;
+        $availableById[$item['id']] = $item;
+    }
+
+    // Add top sellers not already in list
+    foreach ($sales as $mid => $qty) {
+        if (count($popular_items) >= 4) break;
+        if (isset($availableById[$mid])) {
+            // avoid duplicates
+            $already = array_filter($popular_items, fn($p) => isset($p['id']) && $p['id'] == $mid);
+            if (empty($already)) {
+                $popular_items[] = $availableById[$mid];
+            }
+        }
+    }
+
+    // If still not enough, fill with random available items
+    if (count($popular_items) < 4 && !empty($availableItems)) {
+        shuffle($availableItems);
+        foreach ($availableItems as $item) {
+            if (count($popular_items) >= 4) break;
+            $already = array_filter($popular_items, fn($p) => isset($p['id']) && $p['id'] == ($item['id'] ?? null));
+            if (empty($already)) {
+                $popular_items[] = $item;
+            }
+        }
+    }
 }
+
 ob_start();
 ?>
 <!-- Hero Section -->
@@ -129,49 +167,55 @@ ob_start();
         </div>
         
         <!-- Popular Items Grid -->
-        <div class="row g-4">
-            <?php 
-            // Loop through popular items and display each as a card
-            foreach ($popular_items as $index => $item): 
-            ?>
-            <div class="col-md-6 col-lg-3 animate-on-scroll stagger-<?php echo $index + 1; ?>">
-                <div class="card product-card card-hover h-100">
-                    <!-- Product Image Container -->
-                    <div class="product-image">
-                        <img src="<?php echo $item['image'] ?? 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400'; ?>" 
-                             alt="<?php echo $item['name']; ?>" 
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <!-- Placeholder shown if image fails to load -->
-                        <div class="product-placeholder" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--cafe-primary-light) 0%, var(--cafe-primary) 100%); align-items: center; justify-content: center; flex-direction: column;">
-                            <i class="fas fa-coffee fa-3x text-white mb-2"></i>
-                            <span class="text-white small"><?php echo $item['category']; ?></span>
+        <?php if (!empty($popular_items)): ?>
+            <div class="row g-4">
+                <?php foreach ($popular_items as $index => $item): 
+                    $img = $item['image'] ?? 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400';
+                    if (strpos($img, 'http') !== 0) {
+                        $img = '/cloud_9_cafe/' . ltrim($img, '/');
+                    }
+                ?>
+                <div class="col-md-6 col-lg-3 animate-on-scroll stagger-<?php echo $index + 1; ?>">
+                    <div class="card product-card card-hover h-100">
+                        <!-- Product Image Container -->
+                        <div class="product-image">
+                            <img src="<?php echo htmlspecialchars($img); ?>" 
+                                 alt="<?php echo htmlspecialchars($item['name'] ?? ''); ?>" 
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <!-- Placeholder shown if image fails to load -->
+                            <div class="product-placeholder" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, var(--cafe-primary-light) 0%, var(--cafe-primary) 100%); align-items: center; justify-content: center; flex-direction: column;">
+                                <i class="fas fa-coffee fa-3x text-white mb-2"></i>
+                                <span class="text-white small"><?php echo htmlspecialchars($item['category'] ?? ''); ?></span>
+                            </div>
+                            <div class="product-overlay">
+                                <button class="btn btn-light rounded-pill add-to-cart-btn" 
+                                        data-item-id="<?php echo $item['id']; ?>"
+                                        data-item-name="<?php echo htmlspecialchars($item['name'] ?? ''); ?>">
+                                    <i class="fas fa-plus me-1"></i> Add to Cart
+                                </button>
+                            </div>
+                            <span class="badge bg-primary position-absolute top-0 start-0 m-3"><?php echo htmlspecialchars($item['category'] ?? ''); ?></span>
                         </div>
-                        <div class="product-overlay">
-                            <button class="btn btn-light rounded-pill add-to-cart-btn" 
-                                    data-item-id="<?php echo $item['id']; ?>"
-                                    data-item-name="<?php echo htmlspecialchars($item['name']); ?>">
-                                <i class="fas fa-plus me-1"></i> Add to Cart
-                            </button>
-                        </div>
-                        <span class="badge bg-primary position-absolute top-0 start-0 m-3"><?php echo $item['category']; ?></span>
-                    </div>
-                    <div class="product-info">
-                        <h5 class="product-title"><?php echo $item['name']; ?></h5>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="product-price">₹<?php echo number_format($item['price'], 0); ?></span>
-                            <div class="text-warning small">
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
-                                <i class="fas fa-star"></i>
+                        <div class="product-info">
+                            <h5 class="product-title"><?php echo htmlspecialchars($item['name'] ?? ''); ?></h5>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="product-price">₹<?php echo number_format($item['price'] ?? 0, 0); ?></span>
+                                <div class="text-warning small">
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                    <i class="fas fa-star"></i>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <?php endforeach; ?>
             </div>
-            <?php endforeach; ?>
-        </div>
+        <?php else: ?>
+            <div class="alert alert-info">No popular items found. Add menu items and mark some as featured to show them here.</div>
+        <?php endif; ?>
     </div>
 </section>
 <!-- Section: Testimonials Section -->

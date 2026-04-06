@@ -23,7 +23,9 @@
 // SECTION: Database Configuration Include
 // DESCRIPTION: Includes database config which initializes JsonDB and TokenAuth
 // =============================================================================
-include_once '../config/db_config.php';
+include_once '../config/db_config.php'; // JsonDB + TokenAuth
+// Also load MySQL connection for legacy data (admin login fallback)
+include_once '../config/db.php'; // sets $con
 
 // Start PHP session so legacy guards (requireUser/requireAdmin) work after login
 if (session_status() === PHP_SESSION_NONE) {
@@ -66,26 +68,77 @@ if (isset($_POST['login_btn'])) {
     $password = $_POST['password']; // User's password (plain text in demo)
     
     // -------------------------------------------------------------------------
-    // STEP 1: Check if it's an ADMIN login (cafe_admins table)
-    // FUNCTION: $db->selectOne() - Fetches single matching record
-    // PARAMETERS: 'cafe_admins' = table, ['email' => $email, 'password' => $password] = WHERE
+    // STEP 1: Check if it's an ADMIN login (JSON DB)
     // -------------------------------------------------------------------------
     $admin = $db->selectOne('cafe_admins', ['email' => $email, 'password' => $password]);
     
+    // -------------------------------------------------------------------------
+    // STEP 1b: Fallback to MySQL tables if they exist (legacy / hashed passwords)
+    // Guarded by table existence check to avoid fatal errors when table is absent
+    // -------------------------------------------------------------------------
+    if (!$admin && isset($con)) {
+        // Helper to check table existence
+        $hasTable = function($table) use ($con) {
+            $chk = @mysqli_query($con, "SHOW TABLES LIKE '$table'");
+            if ($chk && mysqli_num_rows($chk) > 0) {
+                mysqli_free_result($chk);
+                return true;
+            }
+            if ($chk) { mysqli_free_result($chk); }
+            return false;
+        };
+
+        $candidateTables = ['cafe_admins', 'users', 'cafe_users'];
+        foreach ($candidateTables as $t) {
+            if (!$hasTable($t)) continue;
+            $stmt = mysqli_prepare($con, "SELECT * FROM $t WHERE email=? LIMIT 1");
+            if (!$stmt) continue;
+            mysqli_stmt_bind_param($stmt, "s", $email);
+            mysqli_stmt_execute($stmt);
+            $res = mysqli_stmt_get_result($stmt);
+            $row = $res ? mysqli_fetch_assoc($res) : null;
+            mysqli_stmt_close($stmt);
+            if (!$row) continue;
+
+            // Determine name/role fields
+            $fullName = $row['fullname'] ?? $row['full_name'] ?? $row['name'] ?? 'Admin';
+            $role     = $row['role'] ?? 'admin';
+            $hash     = $row['password'] ?? '';
+            $status   = $row['status'] ?? 'active';
+
+            // Only allow active admin accounts
+            if (strtolower($role) !== 'admin' || strtolower($status) !== 'active') {
+                $row = null;
+                continue;
+            }
+
+            // Password check: supports hashed (bcrypt) and plain text fallback
+            $passOk = password_verify($password, $hash) || hash_equals($hash, $password);
+            if ($passOk) {
+                $admin = [
+                    'id' => $row['id'],
+                    'fullname' => $fullName,
+                    'role' => $role,
+                ];
+                break;
+            }
+        }
+    }
+    
     if ($admin) {
         // Admin found - Set authentication cookie
-        // FUNCTION: $auth->loginAdmin() - Sets admin auth cookie with role
-        // PARAMETERS: admin_id, fullname, role
-        $auth->loginAdmin($admin['id'], $admin['fullname'], $admin['role']);
+        $auth->loginAdmin($admin['id'], $admin['fullname'], $admin['role'] ?? 'admin');
 
         // Legacy session flags for existing dashboards
         $_SESSION['admin'] = true;
         $_SESSION['user'] = null;
         $_SESSION['user_id'] = $admin['id'];
+        $_SESSION['user_name'] = $admin['fullname'];
         
-        // Update last login timestamp
-        // FUNCTION: $db->update() - Updates record in database
-        $db->update('cafe_admins', ['last_login' => date('Y-m-d H:i:s')], ['id' => $admin['id']]);
+        // Update last login timestamp in JSON DB if present there
+        if ($db->selectOne('cafe_admins', ['id' => $admin['id']])) {
+            $db->update('cafe_admins', ['last_login' => date('Y-m-d H:i:s')], ['id' => $admin['id']]);
+        }
         
         // Redirect to admin dashboard
         header("Location: ../admin/dashboard.php");
