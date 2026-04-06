@@ -34,6 +34,20 @@ require_once '../config/db_config.php';
 // Clear the auth cookie using TokenAuth
 // FUNCTION: $auth->logout() - Sets cookie with past expiry to delete it
 $auth->logout();
+
+// Clear legacy session flags as well
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$_SESSION = [];
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    setcookie(session_name(), '', time() - 42000,
+        $params["path"], $params["domain"],
+        $params["secure"], $params["httponly"]
+    );
+}
+session_destroy();
 // =============================================================================
 // END SECTION: Logout Processing
 // =============================================================================
@@ -43,9 +57,8 @@ $auth->logout();
 // DESCRIPTION: Redirect to login page after logout
 // =============================================================================
 
-// Redirect to login page
-// FUNCTION: header() - Sends HTTP Location header for redirection
-header("Location: login.php");
+// Redirect to home page after logout
+header("Location: /cloud_9_cafe/");
 
 // Stop script execution
 // FUNCTION: exit() - Terminates script execution

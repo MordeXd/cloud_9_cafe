@@ -7,6 +7,29 @@ $pageTitle = 'Manage Users - Cloud 9 Cafe';
 $message = '';
 $messageType = '';
 
+// Delete admin account (only admins, prevent self-delete)
+if (isset($_POST['delete_admin_btn'])) {
+    $deleteId = (int) ($_POST['delete_admin_id'] ?? 0);
+    $currentId = (int) ($_SESSION['user_id'] ?? 0);
+
+    if ($deleteId === 0) {
+        $message = 'Invalid admin selected.';
+        $messageType = 'danger';
+    } elseif ($deleteId === $currentId) {
+        $message = 'You cannot delete your own admin account.';
+        $messageType = 'warning';
+    } else {
+        $deleteSql = "DELETE FROM users WHERE id = $deleteId AND role = 'admin'";
+        if (mysqli_query($con, $deleteSql) && mysqli_affected_rows($con) > 0) {
+            $message = 'Admin account deleted.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to delete admin account.';
+            $messageType = 'danger';
+        }
+    }
+}
+
 if (isset($_POST['user_btn'])) {
     $userName = cleanInput($_POST['user_name']);
     $email = cleanInput($_POST['email']);
@@ -84,8 +107,12 @@ include '../includes/header.php';
             </form>
 
             <div class="table-responsive">
-                <table class="table table-bordered">
-                    <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         <?php if ($userList && mysqli_num_rows($userList) > 0): ?>
                             <?php while ($user = mysqli_fetch_assoc($userList)): ?>
@@ -95,10 +122,20 @@ include '../includes/header.php';
                                     <td><?= htmlspecialchars($user['email']) ?></td>
                                     <td><?= htmlspecialchars($user['role']) ?></td>
                                     <td><?= htmlspecialchars($user['status']) ?></td>
+                                    <td>
+                                        <?php if (strtolower($user['role']) === 'admin'): ?>
+                                            <form method="post" action="" onsubmit="return confirm('Delete this admin account?');" class="d-inline">
+                                                <input type="hidden" name="delete_admin_id" value="<?= (int)$user['id']; ?>">
+                                                <button type="submit" name="delete_admin_btn" class="btn btn-sm btn-danger">Delete</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="text-muted small">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="5" class="text-center">No users found.</td></tr>
+                            <tr><td colspan="6" class="text-center">No users found.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

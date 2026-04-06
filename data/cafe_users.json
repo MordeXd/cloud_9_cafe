@@ -7,27 +7,10 @@
         "address": "123 Coffee Street, Cafe City",
         "role": "User",
         "status": "Active",
-        "reward_points": 70,
+        "reward_points": 50,
         "profile_picture": "",
         "id": 1,
-        "created_at": "2026-02-27 20:41:24",
-        "updated_at": "2026-02-28 08:33:38",
-        "gender": ""
-    },
-    {
-        "fullname": "Lodhari Hardik",
-        "email": "hardiklodharee@gmail.com",
-        "password": "Hello@123",
-        "gender": "male",
-        "mobile": "09428492404",
-        "profile_picture": null,
-        "address": "Rajkot",
-        "reward_points": 0,
-        "status": "Active",
-        "role": "User",
-        "token": "69a275f13c358",
-        "id": 2,
-        "created_at": "2026-02-28 05:58:25",
-        "updated_at": "2026-02-28 05:58:25"
+        "created_at": "2026-04-06 06:10:38",
+        "updated_at": "2026-04-06 06:10:38"
     }
 ]

@@ -11,6 +11,6 @@
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'cart' ? 'active' : '' ?>" href="cart.php">Cart</a></li>
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'feedback' ? 'active' : '' ?>" href="feedback.php">Feedback</a></li>
         <li class="nav-item"><a class="nav-link <?= ($activePage ?? '') === 'change_password' ? 'active' : '' ?>" href="change_password.php">Change Password</a></li>
-        <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
+        <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/auth/logout.php">Logout</a></li>
     </ul>
 </aside>
