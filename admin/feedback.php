@@ -2,7 +2,10 @@
 require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
+require_once '../config/Env.php';
+require_once '../includes/mailer.php';
 $pageTitle = 'Manage Feedback - Cloud 9 Cafe';
+$activePage = 'feedback';
 
 $message = '';
 $messageType = '';
@@ -11,12 +14,43 @@ if (isset($_POST['feedback_reply_btn'])) {
     $feedbackId = (int) $_POST['feedback_id'];
     $replyMessage = cleanInput($_POST['reply_message']);
 
-    $updateQuery = "UPDATE feedback SET reply_message='$replyMessage' WHERE id=$feedbackId";
-    if (mysqli_query($con, $updateQuery)) {
-        $message = 'Reply saved successfully.';
-        $messageType = 'success';
+    // Fetch user info for this feedback (needed for email reply).
+    $fbRes = mysqli_query($con, "
+        SELECT f.subject, f.message, u.email, u.full_name 
+        FROM feedback f 
+        JOIN users u ON f.user_id = u.id 
+        WHERE f.id = $feedbackId
+        LIMIT 1");
+
+    if ($fbRes && mysqli_num_rows($fbRes) === 1) {
+        $feedbackRow = mysqli_fetch_assoc($fbRes);
+
+        $updateQuery = "UPDATE feedback SET reply_message='$replyMessage' WHERE id=$feedbackId";
+        if (mysqli_query($con, $updateQuery)) {
+            $message = 'Reply saved and emailed to the user.';
+            $messageType = 'success';
+
+            // Send reply email to the user (best effort).
+            $toEmail  = $feedbackRow['email'];
+            $userName = $feedbackRow['full_name'] ?: 'there';
+            $appName  = Env::get('APP_NAME', 'Cloud 9 Cafe');
+
+            $body = "
+                <p>Hi " . htmlspecialchars($userName) . ",</p>
+                <p>Thanks for your feedback on {$appName}. Here's our reply:</p>
+                <p><strong>Your original subject:</strong> " . htmlspecialchars($feedbackRow['subject']) . "</p>
+                <p><strong>Your message:</strong><br>" . nl2br(htmlspecialchars($feedbackRow['message'])) . "</p>
+                <hr>
+                <p><strong>Our reply:</strong><br>" . nl2br(htmlspecialchars($replyMessage)) . "</p>
+                <p>— {$appName} Team</p>
+            ";
+            sendAppMail($toEmail, "Reply to your feedback at {$appName}", $body);
+        } else {
+            $message = 'Failed to save reply.';
+            $messageType = 'danger';
+        }
     } else {
-        $message = 'Failed to save reply.';
+        $message = 'Feedback not found or user missing.';
         $messageType = 'danger';
     }
 }
@@ -26,20 +60,7 @@ include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="menu_items.php">Menu Items</a></li>
-                <li class="nav-item"><a class="nav-link" href="categories.php">Categories</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link" href="users.php">Users</a></li>
-                <li class="nav-item"><a class="nav-link active" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="settings.php">Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/admin_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Feedback Reply</h1>
             <?php if ($message !== ''): ?>
@@ -83,3 +104,4 @@ include '../includes/header.php';
     </div>
 </div>
 <?php include '../includes/footer.php'; ?>
+

@@ -8,7 +8,9 @@ $(document).ready(function () {
     var validationType = field.data("validation") || "";
     var minLength = field.data("min") || 0;
     var maxLength = field.data("max") || 9999;
-    var fileSize = field.data("filesize") || 0;
+    // fileSize is defined in MB in data-filesize attributes
+    var fileSizeMb = parseFloat(field.data("filesize")) || 0;
+    var fileSizeBytesLimit = fileSizeMb > 0 ? fileSizeMb * 1024 * 1024 : 0;
     var fileType = field.data("filetype") || "";
     let errorMessage = "";
     var isFileInput = field.attr("type") === "file";
@@ -99,9 +101,9 @@ $(document).ready(function () {
     if (isFileInput && field[0].files && field[0].files.length > 0) {
       var file = field[0].files[0];
 
-      if (validationType.includes("fileSize")) {
-        if (file.size > fileSize * 1024) {
-          errorMessage = `File size must be less than ${fileSize}KB.`;
+      if (validationType.includes("fileSize") && fileSizeBytesLimit > 0) {
+        if (file.size > fileSizeBytesLimit) {
+          errorMessage = `File size must be less than ${fileSizeMb}MB.`;
         }
       }
 
@@ -111,7 +113,7 @@ $(document).ready(function () {
           return ext.trim().toLowerCase(); 
         });
         if (allowedExtensions.indexOf(fileExtension) === -1) {
-          errorMessage = `File type must be ${fileType}.`;
+          errorMessage = `Allowed file types: ${allowedExtensions.join(", ")}.`;
         }
       }
     }

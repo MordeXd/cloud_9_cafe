@@ -3,6 +3,8 @@ require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
 $pageTitle = 'Manage Orders - Cloud 9 Cafe';
+$activePage = 'orders';
+$dashboardSearchEnabled = true;
 
 $message = '';
 $messageType = '';
@@ -21,30 +23,37 @@ if (isset($_POST['order_update_btn'])) {
     }
 }
 
-$orderList = mysqli_query($con, "SELECT orders.*, users.full_name FROM orders LEFT JOIN users ON orders.user_id = users.id ORDER BY orders.id DESC");
+$statusFilter = strtolower(trim($_GET['status'] ?? ''));
+$allowedStatuses = ['pending', 'preparing', 'completed', 'cancelled'];
+$statusSql = '';
+if (in_array($statusFilter, $allowedStatuses, true)) {
+    $statusSql = "WHERE orders.order_status = '$statusFilter'";
+}
+$orderList = mysqli_query($con, "SELECT orders.*, users.full_name FROM orders LEFT JOIN users ON orders.user_id = users.id $statusSql ORDER BY orders.id DESC");
 include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="menu_items.php">Menu Items</a></li>
-                <li class="nav-item"><a class="nav-link" href="categories.php">Categories</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link active" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link" href="users.php">Users</a></li>
-                <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="settings.php">Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/admin_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Order Management</h1>
             <?php if ($message !== ''): ?>
                 <div class="alert alert-<?= $messageType ?>"><?= $message ?></div>
             <?php endif; ?>
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-4">
+                <select name="status" class="form-select" style="max-width: 220px;">
+                    <option value="">All Status</option>
+                    <?php foreach ($allowedStatuses as $statusOption): ?>
+                        <option value="<?= $statusOption ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
+                            <?= ucfirst($statusOption) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">Filter</button>
+                <?php if ($statusFilter !== ''): ?>
+                    <a href="orders.php" class="btn btn-light">Clear</a>
+                <?php endif; ?>
+            </form>
             <form method="post" action="" class="table-form-wrap mb-4">
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -77,7 +86,14 @@ include '../includes/header.php';
                                     <td><?= $order['id'] ?></td>
                                     <td><?= htmlspecialchars($order['full_name'] ?? 'Unknown') ?></td>
                                     <td>₹<?= htmlspecialchars($order['total_amount']) ?></td>
-                                    <td><?= htmlspecialchars($order['order_status']) ?></td>
+                                    <?php
+                                        $status = strtolower($order['order_status'] ?? '');
+                                        $badgeClass = 'bg-warning';
+                                        if ($status === 'completed') $badgeClass = 'bg-success';
+                                        if ($status === 'preparing') $badgeClass = 'bg-info';
+                                        if ($status === 'cancelled') $badgeClass = 'bg-danger';
+                                    ?>
+                                    <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars(ucfirst($order['order_status'])) ?></span></td>
                                     <td><?= htmlspecialchars($order['created_at']) ?></td>
                                 </tr>
                             <?php endwhile; ?>

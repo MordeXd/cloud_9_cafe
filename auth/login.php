@@ -45,7 +45,7 @@ if ($auth->isAdminLoggedIn()) {
     $_SESSION['admin'] = true;
     $_SESSION['user'] = null;
     $_SESSION['user_id'] = $auth->getAdminId();
-    header("Location: ../admin/dashboard.php");
+    header("Location: /cloud_9_cafe/admin/dashboard.php");
     exit();
 }
 if ($auth->isUserLoggedIn()) {
@@ -53,7 +53,7 @@ if ($auth->isUserLoggedIn()) {
     $_SESSION['user'] = true;
     $_SESSION['admin'] = null;
     $_SESSION['user_id'] = $auth->getUserId();
-    header("Location: ../user/dashboard.php");
+    header("Location: /cloud_9_cafe/user/dashboard.php");
     exit();
 }
 
@@ -90,13 +90,13 @@ if (isset($_POST['login_btn'])) {
                 $_SESSION['admin'] = true;
                 $_SESSION['user'] = null;
                 $auth->loginAdmin($row['id'], $fullName ?: 'Admin', 'admin');
-                header("Location: ../admin/dashboard.php");
+                header("Location: /cloud_9_cafe/admin/dashboard.php");
                 exit();
             } else {
                 $_SESSION['user'] = true;
                 $_SESSION['admin'] = null;
                 $auth->loginUser($row['id'], $fullName ?: 'User', 'User');
-                header("Location: ../user/dashboard.php");
+                header("Location: /cloud_9_cafe/user/dashboard.php");
                 exit();
             }
         }

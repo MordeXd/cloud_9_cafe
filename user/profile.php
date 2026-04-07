@@ -4,12 +4,16 @@ require_once '../includes/auth.php';
 requireUser();
 require_once '../config/db.php';
 require_once '../includes/mailer.php';
+require_once '../includes/upload_helpers.php';
 $env = loadEnv(__DIR__ . '/../.env');
 $pageTitle = 'My Profile - Cloud 9 Cafe';
+$activePage = 'profile';
 
 $message = '';
 $messageType = '';
 $userId = currentUserId();
+$userQuery = mysqli_query($con, "SELECT * FROM users WHERE id = $userId LIMIT 1");
+$userData = $userQuery ? mysqli_fetch_assoc($userQuery) : null;
 
 if (isset($_POST['profile_btn'])) {
     $fullName = cleanInput($_POST['full_name']);
@@ -17,48 +21,47 @@ if (isset($_POST['profile_btn'])) {
     $phone = cleanInput($_POST['phone']);
 
     $profileImageSql = '';
+    $uploadError = '';
     if (!empty($_FILES['profile_image']['name'])) {
-        $uploadDir = __DIR__ . '/../' . rtrim($env['UPLOAD_PATH'] ?? 'uploads/', '/') . '/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+        [$relativePath, $uploadError] = saveUploadedImage(
+            $_FILES['profile_image'],
+            'profile_photo',
+            $userData['full_name'] ?? ($_SESSION['user_name'] ?? 'user'),
+            'profile_'
+        );
+
+        if ($uploadError) {
+            $message = $uploadError;
+            $messageType = 'danger';
+        } else {
+            $safePath = mysqli_real_escape_string($con, $relativePath);
+            $profileImageSql = ", profile_image='$safePath'";
         }
-        $profileImageName = time() . '_' . basename($_FILES['profile_image']['name']);
-        move_uploaded_file($_FILES['profile_image']['tmp_name'], $uploadDir . $profileImageName);
-        $profileImageSql = ", profile_image='$profileImageName'";
     }
 
-    $updateQuery = "UPDATE users SET full_name='$fullName', email='$email', phone='$phone' $profileImageSql WHERE id=$userId";
+    if ($messageType !== 'danger') {
+        $updateQuery = "UPDATE users SET full_name='$fullName', email='$email', phone='$phone' $profileImageSql WHERE id=$userId";
 
-    if (mysqli_query($con, $updateQuery)) {
-        $_SESSION['user'] = $email;
-        $_SESSION['user_name'] = $fullName;
-        $message = 'Profile updated successfully.';
-        $messageType = 'success';
-    } else {
-        $message = 'Profile update failed.';
-        $messageType = 'danger';
+        if (mysqli_query($con, $updateQuery)) {
+            $_SESSION['user'] = $email;
+            $_SESSION['user_name'] = $fullName;
+            $message = 'Profile updated successfully.';
+            $messageType = 'success';
+            // Refresh data to reflect saved changes and new image path.
+            $userQuery = mysqli_query($con, "SELECT * FROM users WHERE id = $userId LIMIT 1");
+            $userData = $userQuery ? mysqli_fetch_assoc($userQuery) : $userData;
+        } else {
+            $message = 'Profile update failed.';
+            $messageType = 'danger';
+        }
     }
 }
-
-$userQuery = mysqli_query($con, "SELECT * FROM users WHERE id = $userId LIMIT 1");
-$userData = $userQuery ? mysqli_fetch_assoc($userQuery) : null;
 
 include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">User Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link active" href="profile.php">Profile</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="change_password.php">Change Password</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/user_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Update Profile</h1>
             <?php if ($message !== ''): ?>
@@ -85,7 +88,7 @@ include '../includes/header.php';
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Profile Image</label>
-                        <input type="file" name="profile_image" class="form-control" data-validation="fileSize fileType" data-filesize="2" data-filetype="jpg,jpeg,png">
+                        <input type="file" name="profile_image" class="form-control" data-validation="fileSize fileType" data-filesize="5" data-filetype="jpg,jpeg,png,webp">
                         <span id="profile_image_error"></span>
                     </div>
                 </div>
@@ -95,3 +98,4 @@ include '../includes/header.php';
     </div>
 </div>
 <?php include '../includes/footer.php'; ?>
+

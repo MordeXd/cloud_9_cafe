@@ -1,5 +1,7 @@
 <?php
 require_once '../config/db.php';
+require_once '../config/Env.php';
+require_once '../includes/mailer.php';
 
 // Process form submission
 $success = '';
@@ -32,6 +34,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         mysqli_stmt_bind_param($stmt, "ssss", $name, $email, $subject, $message);
         if (mysqli_stmt_execute($stmt)) {
             $success = "Thank you for your message! We'll get back to you soon.";
+
+            // Email notification to admin and confirmation to sender.
+            $adminEmail = Env::get('ADMIN_EMAIL', Env::get('MAIL_FROM_ADDRESS', 'cloud9cafe.website@gmail.com'));
+            $appName    = Env::get('APP_NAME', 'Cloud 9 Cafe');
+
+            $adminBody = "
+                <p>You have received a new contact message on <strong>{$appName}</strong>.</p>
+                <p><strong>Name:</strong> " . htmlspecialchars($name) . "<br>
+                <strong>Email:</strong> " . htmlspecialchars($email) . "<br>
+                <strong>Subject:</strong> " . htmlspecialchars($subject) . "</p>
+                <p><strong>Message:</strong><br>" . nl2br(htmlspecialchars($message)) . "</p>
+            ";
+            $userBody = "
+                <p>Hi " . htmlspecialchars($name) . ",</p>
+                <p>Thanks for reaching out to {$appName}! We received your message and will respond soon.</p>
+                <p><strong>Your message:</strong><br>" . nl2br(htmlspecialchars($message)) . "</p>
+                <p>— {$appName} Team</p>
+            ";
+
+            // Best-effort emails; keep the success toast even if email fails.
+            sendAppMail($adminEmail, "[{$appName}] New contact message", $adminBody);
+            sendAppMail($email, "We received your message at {$appName}", $userBody);
         } else {
             $error = "Failed to submit your message. Please try again.";
         }

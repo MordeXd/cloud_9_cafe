@@ -2,6 +2,7 @@
 require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
+require_once '../includes/upload_helpers.php';
 
 $pageTitle = 'Manage Menu Items - Cloud 9 Cafe';
 $activePage = 'menu_items';
@@ -36,49 +37,62 @@ if ($editId > 0) {
     $editItem = $res ? mysqli_fetch_assoc($res) : null;
 }
 
-$uploadDir = __DIR__ . '/../uploads/';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0755, true);
-}
-
 if (isset($_POST['menu_btn'])) {
     $itemId = isset($_POST['item_id']) ? (int)$_POST['item_id'] : 0;
-    $itemName = cleanInput($_POST['item_name']);
+    $itemNameRaw = $_POST['item_name'] ?? '';
+    $itemName = cleanInput($itemNameRaw);
     $categoryId = (int)($_POST['category_id'] ?? 0);
     $description = cleanInput($_POST['description']);
     $price = (float)($_POST['price'] ?? 0);
     $status = cleanInput($_POST['status']);
 
     $imageSql = '';
+    $relativePath = '';
+    $uploadError = '';
     if (!empty($_FILES['item_image']['name'])) {
-        $imageName = time() . '_' . basename($_FILES['item_image']['name']);
-        move_uploaded_file($_FILES['item_image']['tmp_name'], $uploadDir . $imageName);
-        $imageSql = ", item_image='$imageName'";
+        [$relativePath, $uploadError] = saveUploadedImage(
+            $_FILES['item_image'],
+            'item_image',
+            $itemNameRaw ?: ($editItem['item_name'] ?? 'item'),
+            'item_'
+        );
+
+        if ($uploadError) {
+            $message = $uploadError;
+            $messageType = 'danger';
+        } else {
+            $safePath = mysqli_real_escape_string($con, $relativePath);
+            $imageSql = ", item_image='$safePath'";
+        }
     }
 
-    if ($itemId > 0) {
-        // Update existing
-        $update = "UPDATE menu_items SET category_id=$categoryId, item_name='$itemName', description='$description', price=$price, status='$status' $imageSql WHERE id=$itemId";
-        if (mysqli_query($con, $update)) {
-            $message = 'Menu item updated successfully.';
-            $messageType = 'success';
-            header('Location: menu_items.php');
-            exit;
+    if ($uploadError === '') {
+        if ($itemId > 0) {
+            // Update existing
+            $update = "UPDATE menu_items SET category_id=$categoryId, item_name='$itemName', description='$description', price=$price, status='$status' $imageSql WHERE id=$itemId";
+            if (mysqli_query($con, $update)) {
+                $message = 'Menu item updated successfully.';
+                $messageType = 'success';
+                header('Location: menu_items.php');
+                exit;
+            } else {
+                $message = 'Failed to update menu item.';
+                $messageType = 'danger';
+            }
         } else {
-            $message = 'Failed to update menu item.';
-            $messageType = 'danger';
-        }
-    } else {
-        // Insert new
-        $insert = "INSERT INTO menu_items (category_id, item_name, description, price, status" . ($imageSql ? ', item_image' : '') . ") VALUES ($categoryId, '$itemName', '$description', $price, '$status'" . ($imageSql ? ", '$imageName'" : '') . ")";
-        if (mysqli_query($con, $insert)) {
-            $message = 'Menu item added successfully.';
-            $messageType = 'success';
-            header('Location: menu_items.php');
-            exit;
-        } else {
-            $message = 'Failed to add menu item.';
-            $messageType = 'danger';
+            // Insert new
+            $imageColumns = $imageSql ? ', item_image' : '';
+            $imageValues  = $imageSql ? ", '" . mysqli_real_escape_string($con, $relativePath) . "'" : '';
+            $insert = "INSERT INTO menu_items (category_id, item_name, description, price, status$imageColumns) VALUES ($categoryId, '$itemName', '$description', $price, '$status'$imageValues)";
+            if (mysqli_query($con, $insert)) {
+                $message = 'Menu item added successfully.';
+                $messageType = 'success';
+                header('Location: menu_items.php');
+                exit;
+            } else {
+                $message = 'Failed to add menu item.';
+                $messageType = 'danger';
+            }
         }
     }
 }
@@ -140,7 +154,7 @@ include '../includes/header.php';
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Image</label>
-                        <input type="file" name="item_image" class="form-control" data-validation="fileSize fileType" data-filesize="2" data-filetype="jpg,jpeg,png">
+                        <input type="file" name="item_image" class="form-control" data-validation="fileSize fileType" data-filesize="5" data-filetype="jpg,jpeg,png,webp">
                         <span id="item_image_error"></span>
                         <?php if (!empty($editItem['item_image'])): ?>
                             <small class="text-muted d-block mt-1">Current: <?= htmlspecialchars($editItem['item_image']) ?></small>

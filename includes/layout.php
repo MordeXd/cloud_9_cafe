@@ -35,26 +35,57 @@ $current_user_data = null;
 $cart_count = 0;
 $display_name = 'User';
 
-$loggedInUserId = null;
-if (!empty($_SESSION['user_id'])) {
-    $loggedInUserId = (int)$_SESSION['user_id'];
-} elseif ($auth->isUserLoggedIn()) {
-    $loggedInUserId = (int)$auth->getUserId();
-    $_SESSION['user_id'] = $loggedInUserId;
+$tokenUser = $auth->getCurrentUser();
+$isTokenAdmin = $tokenUser && (($tokenUser['type'] ?? '') === 'admin');
+$isTokenUser = $tokenUser && (($tokenUser['type'] ?? '') === 'user');
+
+if ($isTokenAdmin) {
+    $_SESSION['admin'] = true;
+    $_SESSION['user'] = null;
+    $_SESSION['user_id'] = $tokenUser['id'] ?? null;
+    $_SESSION['user_name'] = $tokenUser['name'] ?? 'Admin';
+} elseif ($isTokenUser) {
+    $_SESSION['user'] = true;
+    $_SESSION['admin'] = null;
+    $_SESSION['user_id'] = $tokenUser['id'] ?? null;
+    $_SESSION['user_name'] = $tokenUser['name'] ?? 'User';
 }
 
-if ($loggedInUserId) {
-    $userRes = mysqli_query($con, "SELECT * FROM users WHERE id = $loggedInUserId LIMIT 1");
-    $current_user_data = $userRes ? mysqli_fetch_assoc($userRes) : null;
-    if (!empty($current_user_data['full_name'])) {
-        $display_name = $current_user_data['full_name'];
-    } elseif (!empty($current_user_data['fullname'])) {
-        $display_name = $current_user_data['fullname'];
-    } elseif ($auth->isUserLoggedIn()) {
-        $display_name = $auth->getUserName() ?: 'User';
-    }
+$isAdmin = $isTokenAdmin || !empty($_SESSION['admin']);
+$isUser = $isTokenUser || !empty($_SESSION['user']);
+if ($isAdmin && $isUser) {
+    $isUser = false;
+}
+if (!$isAdmin && !$isUser && !empty($_SESSION['user_id'])) {
+    $isUser = true;
+}
+$isLoggedIn = $isAdmin || $isUser;
+$dashboardLink = $isAdmin ? '/cloud_9_cafe/admin/dashboard.php' : '/cloud_9_cafe/user/dashboard.php';
 
-    $cartRes = mysqli_query($con, "SELECT COALESCE(SUM(quantity),0) AS qty FROM cart WHERE user_id = $loggedInUserId");
+$userIdForProfile = null;
+if ($isLoggedIn) {
+    $userIdForProfile = (int)($_SESSION['user_id'] ?? ($tokenUser['id'] ?? 0));
+}
+
+if ($userIdForProfile) {
+    $userRes = mysqli_query($con, "SELECT * FROM users WHERE id = $userIdForProfile LIMIT 1");
+    $current_user_data = $userRes ? mysqli_fetch_assoc($userRes) : null;
+}
+
+if (!empty($current_user_data['full_name'])) {
+    $display_name = $current_user_data['full_name'];
+} elseif (!empty($current_user_data['fullname'])) {
+    $display_name = $current_user_data['fullname'];
+} elseif ($tokenUser && !empty($tokenUser['name'])) {
+    $display_name = $tokenUser['name'];
+} elseif (!empty($_SESSION['user_name'])) {
+    $display_name = $_SESSION['user_name'];
+} else {
+    $display_name = $isAdmin ? 'Admin' : 'User';
+}
+
+if ($isUser && $userIdForProfile) {
+    $cartRes = mysqli_query($con, "SELECT COALESCE(SUM(quantity),0) AS qty FROM cart WHERE user_id = $userIdForProfile");
     if ($cartRes) {
         $row = mysqli_fetch_assoc($cartRes);
         $cart_count = (int)($row['qty'] ?? 0);
@@ -90,7 +121,7 @@ if ($loggedInUserId) {
     <!-- Layout CSS - Public layout specific styles (navbar, footer, components) -->
     <link rel="stylesheet" href="/cloud_9_cafe/assets/css/layout/layout.css">
 </head>
-<body>
+<body data-role="<?php echo $isAdmin ? 'admin' : ($isLoggedIn ? 'user' : 'guest'); ?>">
 
     <!-- ========================================================================= -->
     <!-- SECTION: Navigation Bar (Navbar) -->
@@ -160,16 +191,18 @@ if ($loggedInUserId) {
                     // If YES: Show Cart icon and User dropdown menu
                     // If NO:  Show Login and Register buttons
                     // =====================================================================
-                    if ($loggedInUserId):
+                    if ($isLoggedIn):
                     ?>
-                        <!-- Cart Icon with Badge - Click redirects to: user/cart.php -->
-                        <li class="nav-item me-3">
-                            <a class="nav-link position-relative" href="/cloud_9_cafe/user/cart.php">
-                                <i class="fas fa-shopping-cart"></i>
-                                <!-- Cart count badge - Updates dynamically via JavaScript -->
-                                <span class="cart-badge" id="navbarCartCount"><?php echo $cart_count; ?></span>
-                            </a>
-                        </li>
+                        <?php if ($isUser): ?>
+                            <!-- Cart Icon with Badge - Click redirects to: user/cart.php -->
+                            <li class="nav-item me-3">
+                                <a class="nav-link position-relative" href="/cloud_9_cafe/user/cart.php">
+                                    <i class="fas fa-shopping-cart"></i>
+                                    <!-- Cart count badge - Updates dynamically via JavaScript -->
+                                    <span class="cart-badge" id="navbarCartCount"><?php echo $cart_count; ?></span>
+                                </a>
+                            </li>
+                        <?php endif; ?>
                         
                         <!-- User Dropdown Menu - Shows profile, orders, logout -->
                         <li class="nav-item dropdown">
@@ -184,11 +217,13 @@ if ($loggedInUserId) {
                             <!-- Dropdown menu items -->
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <!-- Dashboard - Click redirects to: user/dashboard.php -->
-                                <li><a class="dropdown-item" href="/cloud_9_cafe/user/dashboard.php"><i class="fas fa-th-large me-2 text-primary"></i>Dashboard</a></li>
-                                <!-- Profile - Click redirects to: user/profile.php -->
-                                <li><a class="dropdown-item" href="/cloud_9_cafe/user/profile.php"><i class="fas fa-user me-2 text-primary"></i>Profile</a></li>
-                                <!-- Orders - Click redirects to: user/orders.php -->
-                                <li><a class="dropdown-item" href="/cloud_9_cafe/user/orders.php"><i class="fas fa-shopping-bag me-2 text-primary"></i>My Orders</a></li>
+                                <li><a class="dropdown-item" href="<?php echo $dashboardLink; ?>"><i class="fas fa-th-large me-2 text-primary"></i>Dashboard</a></li>
+                                <?php if ($isUser): ?>
+                                    <!-- Profile - Click redirects to: user/profile.php -->
+                                    <li><a class="dropdown-item" href="/cloud_9_cafe/user/profile.php"><i class="fas fa-user me-2 text-primary"></i>Profile</a></li>
+                                    <!-- Orders - Click redirects to: user/orders.php -->
+                                    <li><a class="dropdown-item" href="/cloud_9_cafe/user/orders.php"><i class="fas fa-shopping-bag me-2 text-primary"></i>My Orders</a></li>
+                                <?php endif; ?>
                                 <li><hr class="dropdown-divider"></li>
                                 <!-- Logout - Click redirects to: auth/logout.php (clears auth cookie) -->
                                 <li><a class="dropdown-item text-danger" href="/cloud_9_cafe/auth/logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
@@ -314,6 +349,27 @@ if ($loggedInUserId) {
 
     <!-- Toast Container - For displaying notification messages -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <?php if ($isAdmin): ?>
+        <!-- Admin Restriction Modal -->
+        <div class="modal fade" id="adminRestrictionModal" tabindex="-1" aria-labelledby="adminRestrictionLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="adminRestrictionLabel">Customer Access Required</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Please login as a customer to place orders.
+                    </div>
+                    <div class="modal-footer">
+                        <a href="/cloud_9_cafe/auth/logout.php" class="btn btn-outline-secondary">Logout</a>
+                        <a href="/cloud_9_cafe/auth/login.php" class="btn btn-primary">Login as Customer</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- Bootstrap JS - Required for navbar toggle, dropdowns, modals -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

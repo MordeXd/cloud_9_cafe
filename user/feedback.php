@@ -4,6 +4,7 @@ require_once '../includes/auth.php';
 requireUser();
 require_once '../config/db.php';
 $pageTitle = 'Feedback - Cloud 9 Cafe';
+$activePage = 'feedback';
 
 $message = '';
 $messageType = '';
@@ -30,17 +31,7 @@ include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">User Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="profile.php">Profile</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link active" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="change_password.php">Change Password</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/user_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Share Your Feedback</h1>
             <?php if ($message !== ''): ?>

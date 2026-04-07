@@ -3,6 +3,8 @@ require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
 $pageTitle = 'Manage Users - Cloud 9 Cafe';
+$activePage = 'users';
+$dashboardSearchEnabled = true;
 
 $message = '';
 $messageType = '';
@@ -46,30 +48,51 @@ if (isset($_POST['user_btn'])) {
     }
 }
 
-$userList = mysqli_query($con, "SELECT * FROM users ORDER BY id DESC");
+$roleFilter = strtolower(trim($_GET['role'] ?? ''));
+$statusFilter = strtolower(trim($_GET['status'] ?? ''));
+$allowedRoles = ['user', 'admin'];
+$allowedStatuses = ['active', 'inactive'];
+$conditions = [];
+if (in_array($roleFilter, $allowedRoles, true)) {
+    $conditions[] = "role = '$roleFilter'";
+}
+if (in_array($statusFilter, $allowedStatuses, true)) {
+    $conditions[] = "status = '$statusFilter'";
+}
+$whereSql = $conditions ? ('WHERE ' . implode(' AND ', $conditions)) : '';
+$userList = mysqli_query($con, "SELECT * FROM users $whereSql ORDER BY id DESC");
 include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="menu_items.php">Menu Items</a></li>
-                <li class="nav-item"><a class="nav-link" href="categories.php">Categories</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link active" href="users.php">Users</a></li>
-                <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="settings.php">Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/admin_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">User Management</h1>
             <?php if ($message !== ''): ?>
                 <div class="alert alert-<?= $messageType ?>"><?= $message ?></div>
             <?php endif; ?>
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-4">
+                <select name="role" class="form-select" style="max-width: 200px;">
+                    <option value="">All Roles</option>
+                    <?php foreach ($allowedRoles as $roleOption): ?>
+                        <option value="<?= $roleOption ?>" <?= $roleFilter === $roleOption ? 'selected' : '' ?>>
+                            <?= ucfirst($roleOption) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <select name="status" class="form-select" style="max-width: 200px;">
+                    <option value="">All Status</option>
+                    <?php foreach ($allowedStatuses as $statusOption): ?>
+                        <option value="<?= $statusOption ?>" <?= $statusFilter === $statusOption ? 'selected' : '' ?>>
+                            <?= ucfirst($statusOption) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="btn btn-outline-secondary">Filter</button>
+                <?php if ($roleFilter !== '' || $statusFilter !== ''): ?>
+                    <a href="users.php" class="btn btn-light">Clear</a>
+                <?php endif; ?>
+            </form>
             <form method="post" action="" class="table-form-wrap mb-4">
                 <div class="row">
                     <div class="col-md-6 mb-3">
@@ -120,8 +143,14 @@ include '../includes/header.php';
                                     <td><?= $user['id'] ?></td>
                                     <td><?= htmlspecialchars($user['full_name']) ?></td>
                                     <td><?= htmlspecialchars($user['email']) ?></td>
-                                    <td><?= htmlspecialchars($user['role']) ?></td>
-                                    <td><?= htmlspecialchars($user['status']) ?></td>
+                                    <?php
+                                        $roleValue = strtolower($user['role'] ?? '');
+                                        $roleBadge = $roleValue === 'admin' ? 'bg-primary' : 'bg-info';
+                                        $statusValue = strtolower($user['status'] ?? '');
+                                        $statusBadge = $statusValue === 'active' ? 'bg-success' : 'bg-secondary';
+                                    ?>
+                                    <td><span class="badge <?= $roleBadge ?>"><?= htmlspecialchars(ucfirst($user['role'])) ?></span></td>
+                                    <td><span class="badge <?= $statusBadge ?>"><?= htmlspecialchars(ucfirst($user['status'])) ?></span></td>
                                     <td>
                                         <?php if (strtolower($user['role']) === 'admin'): ?>
                                             <form method="post" action="" onsubmit="return confirm('Delete this admin account?');" class="d-inline">
@@ -144,3 +173,4 @@ include '../includes/header.php';
     </div>
 </div>
 <?php include '../includes/footer.php'; ?>
+

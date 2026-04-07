@@ -29,6 +29,23 @@ ensureColumn($con, 'menu_items', 'featured', "featured TINYINT(1) NOT NULL DEFAU
 ensureColumn($con, 'menu_items', 'availability', "availability VARCHAR(20) NOT NULL DEFAULT 'Available'");
 ensureColumn($con, 'menu_items', 'updated_at', "updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
 
+$resolveImageUrl = function (?string $storedPath): string {
+    if (empty($storedPath)) {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $storedPath)) {
+        return $storedPath;
+    }
+    $normalized = ltrim($storedPath, '/');
+    if (str_starts_with($normalized, 'images/')) {
+        return '/cloud_9_cafe/' . $normalized;
+    }
+    if (str_starts_with($normalized, 'uploads/')) {
+        return '/cloud_9_cafe/' . $normalized;
+    }
+    return '/cloud_9_cafe/uploads/' . $normalized;
+};
+
 $featuredSql = "
     SELECT mi.*, c.category_name 
     FROM menu_items mi
@@ -184,9 +201,7 @@ ob_start();
             <div class="row g-4">
                 <?php foreach ($popular_items as $index => $item): 
                     $img = $item['item_image'] ?? $item['image'] ?? 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400';
-                    if ($img && strpos($img, 'http') !== 0) {
-                        $img = '/cloud_9_cafe/uploads/' . ltrim($img, '/');
-                    }
+                    $img = $resolveImageUrl($img) ?: $img;
                 ?>
                 <div class="col-md-6 col-lg-3 animate-on-scroll stagger-<?php echo $index + 1; ?>">
                     <div class="card product-card card-hover h-100">
@@ -351,10 +366,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const addToCartBtns = document.querySelectorAll('.add-to-cart-btn');
     const cartToast = new bootstrap.Toast(document.getElementById('cartToast'));
     const cartToastMessage = document.getElementById('cartToastMessage');
+    const isAdmin = document.body.dataset.role === 'admin';
+    const adminModalEl = document.getElementById('adminRestrictionModal');
+    const adminModal = adminModalEl ? new bootstrap.Modal(adminModalEl) : null;
 
     addToCartBtns.forEach(btn => {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
+            if (isAdmin) {
+                if (adminModal) {
+                    adminModal.show();
+                }
+                return;
+            }
             const itemId = this.dataset.itemId;
             const itemName = this.dataset.itemName;
 
@@ -390,6 +414,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     if (data.redirect) {
                         window.location.href = data.redirect;
+                    } else if (data.admin_only) {
+                        if (adminModal) {
+                            adminModal.show();
+                        }
                     } else {
                         cartToastMessage.textContent = data.message;
                         document.getElementById('cartToast').classList.remove('bg-success');

@@ -3,6 +3,7 @@ require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
 $pageTitle = 'Manage Reservations - Cloud 9 Cafe';
+$activePage = 'reservations';
 
 $message = '';
 $messageType = '';
@@ -26,20 +27,7 @@ include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="menu_items.php">Menu Items</a></li>
-                <li class="nav-item"><a class="nav-link" href="categories.php">Categories</a></li>
-                <li class="nav-item"><a class="nav-link active" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link" href="users.php">Users</a></li>
-                <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link" href="settings.php">Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/admin_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Reservation Management</h1>
             <?php if ($message !== ''): ?>

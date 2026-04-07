@@ -1,37 +1,58 @@
 <?php
 // Menu page (frontend refreshed to match rebuild design; backend logic unchanged)
 include 'config/db.php';
+require_once 'config/TokenAuth.php';
+$auth = new TokenAuth();
+$tokenUser = $auth->getCurrentUser();
+$isAdminRequest = ($tokenUser && (($tokenUser['type'] ?? '') === 'admin')) || !empty($_SESSION['admin']);
+if ($tokenUser && (($tokenUser['type'] ?? '') === 'user')) {
+    $_SESSION['user'] = true;
+    $_SESSION['admin'] = null;
+    $_SESSION['user_id'] = $tokenUser['id'] ?? null;
+    $_SESSION['user_name'] = $tokenUser['name'] ?? 'User';
+} elseif ($tokenUser && (($tokenUser['type'] ?? '') === 'admin')) {
+    $_SESSION['admin'] = true;
+    $_SESSION['user'] = null;
+    $_SESSION['user_id'] = $tokenUser['id'] ?? null;
+    $_SESSION['user_name'] = $tokenUser['name'] ?? 'Admin';
+}
 $pageTitle = 'Menu - Cloud 9 Cafe';
 
 $message = '';
 $messageType = '';
+$showAdminModal = false;
 
 // Handle add to cart
 if (isset($_POST['add_to_cart_btn'])) {
-    if (!isset($_SESSION['user_id'])) {
+    if ($isAdminRequest) {
+        $message = 'Admins cannot place orders. Please login as a customer.';
+        $messageType = 'danger';
+        $showAdminModal = true;
+    } elseif (!isset($_SESSION['user_id'])) {
         header('Location: /cloud_9_cafe/auth/login.php');
         exit;
-    }
-
-    $userId = (int) $_SESSION['user_id'];
-    $menuItemId = (int) $_POST['menu_item_id'];
-    $quantity = max(1, (int) $_POST['quantity']);
-
-    $checkCart = mysqli_query($con, "SELECT id, quantity FROM cart WHERE user_id = $userId AND menu_item_id = $menuItemId LIMIT 1");
-    if ($checkCart && mysqli_num_rows($checkCart) > 0) {
-        $cartRow = mysqli_fetch_assoc($checkCart);
-        $newQty = $cartRow['quantity'] + $quantity;
-        $result = mysqli_query($con, "UPDATE cart SET quantity = $newQty WHERE id = {$cartRow['id']}");
     } else {
-        $result = mysqli_query($con, "INSERT INTO cart (user_id, menu_item_id, quantity) VALUES ($userId, $menuItemId, $quantity)");
-    }
 
-    if ($result) {
-        $message = 'Item added to cart successfully.';
-        $messageType = 'success';
-    } else {
-        $message = 'Failed to add item to cart.';
-        $messageType = 'danger';
+        $userId = (int) $_SESSION['user_id'];
+        $menuItemId = (int) $_POST['menu_item_id'];
+        $quantity = max(1, (int) $_POST['quantity']);
+
+        $checkCart = mysqli_query($con, "SELECT id, quantity FROM cart WHERE user_id = $userId AND menu_item_id = $menuItemId LIMIT 1");
+        if ($checkCart && mysqli_num_rows($checkCart) > 0) {
+            $cartRow = mysqli_fetch_assoc($checkCart);
+            $newQty = $cartRow['quantity'] + $quantity;
+            $result = mysqli_query($con, "UPDATE cart SET quantity = $newQty WHERE id = {$cartRow['id']}");
+        } else {
+            $result = mysqli_query($con, "INSERT INTO cart (user_id, menu_item_id, quantity) VALUES ($userId, $menuItemId, $quantity)");
+        }
+
+        if ($result) {
+            $message = 'Item added to cart successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to add item to cart.';
+            $messageType = 'danger';
+        }
     }
 }
 
@@ -66,6 +87,28 @@ $menuQuery = "
     ORDER BY c.category_name ASC, mi.item_name ASC
 ";
 $menuItems = mysqli_query($con, $menuQuery);
+
+function resolveItemImageUrl(?string $storedPath): string
+{
+    if (empty($storedPath)) {
+        return '';
+    }
+
+    if (preg_match('#^https?://#i', $storedPath)) {
+        return $storedPath;
+    }
+
+    $normalized = ltrim($storedPath, '/');
+    if (str_starts_with($normalized, 'images/')) {
+        return '/cloud_9_cafe/' . $normalized;
+    }
+
+    if (str_starts_with($normalized, 'uploads/')) {
+        return '/cloud_9_cafe/' . $normalized;
+    }
+
+    return '/cloud_9_cafe/uploads/' . $normalized;
+}
 
 include 'includes/header.php';
 ?>
@@ -133,17 +176,12 @@ include 'includes/header.php';
             </div>
         <?php else: ?>
             <div class="row g-4">
-                <?php 
-                $stagger = 0;
-                while ($item = mysqli_fetch_assoc($menuItems)): 
-                    $stagger = ($stagger + 1) % 5;
-                    $imagePath = '';
-                    if (!empty($item['item_image'])) {
-                        $cleanName = basename($item['item_image']);
-                        $uploadPath = "/cloud_9_cafe/uploads/{$cleanName}";
-                        $imagePath = $uploadPath;
-                    }
-                ?>
+                            <?php 
+                            $stagger = 0;
+                            while ($item = mysqli_fetch_assoc($menuItems)): 
+                                $stagger = ($stagger + 1) % 5;
+                                $imagePath = resolveItemImageUrl($item['item_image'] ?? '');
+                            ?>
                 <div class="col-md-6 col-lg-4 col-xl-3 animate-on-scroll stagger-<?= $stagger; ?>">
                     <div class="card product-card card-hover h-100">
                         <div class="product-image" style="position: relative;">
@@ -160,13 +198,19 @@ include 'includes/header.php';
                                 <span class="text-white small">Cloud 9 Cafe</span>
                             </div>
                             <div class="product-overlay">
-                                <form method="POST" action="menu.php" class="d-inline">
-                                    <input type="hidden" name="menu_item_id" value="<?= (int)$item['id']; ?>">
-                                    <input type="hidden" name="quantity" value="1">
-                                    <button type="submit" name="add_to_cart_btn" class="btn btn-accent rounded-pill">
+                                <?php if ($isAdmin): ?>
+                                    <button type="button" class="btn btn-accent rounded-pill" data-bs-toggle="modal" data-bs-target="#adminRestrictionModal">
                                         <i class="fas fa-cart-plus me-2"></i>Add to Cart
                                     </button>
-                                </form>
+                                <?php else: ?>
+                                    <form method="POST" action="menu.php" class="d-inline">
+                                        <input type="hidden" name="menu_item_id" value="<?= (int)$item['id']; ?>">
+                                        <input type="hidden" name="quantity" value="1">
+                                        <button type="submit" name="add_to_cart_btn" class="btn btn-accent rounded-pill">
+                                            <i class="fas fa-cart-plus me-2"></i>Add to Cart
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="product-info">
@@ -181,7 +225,11 @@ include 'includes/header.php';
                             </p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <span class="product-price">&#8377;<?= htmlspecialchars(number_format((float)$item['price'], 2)); ?></span>
-                                <?php if ($isLoggedIn): ?>
+                                <?php if ($isAdmin): ?>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#adminRestrictionModal">
+                                        Add <i class="fas fa-plus ms-1"></i>
+                                    </button>
+                                <?php elseif ($isLoggedIn): ?>
                                     <form method="POST" action="menu.php" class="d-inline">
                                         <input type="hidden" name="menu_item_id" value="<?= (int)$item['id']; ?>">
                                         <input type="hidden" name="quantity" value="1">
@@ -204,21 +252,16 @@ include 'includes/header.php';
     </div>
 </section>
 
-<!-- Call to Action -->
-<section class="py-5">
-    <div class="container">
-        <div class="card border-0 overflow-hidden" style="background: linear-gradient(135deg, var(--cafe-accent) 0%, #E8C9A0 100%);">
-            <div class="card-body p-5 text-center">
-                <h3 class="fw-bold mb-3" style="color: var(--cafe-primary-dark);">
-                    <i class="fas fa-percent me-2"></i>Special Offer
-                </h3>
-                <p class="mb-4" style="color: var(--cafe-primary-dark);">Get 10% off when you order 3 or more items. Use code <strong>BUNDLE10</strong></p>
-                <a href="/cloud_9_cafe/user/cart.php" class="btn btn-primary btn-lg">
-                    View Cart <i class="fas fa-shopping-cart ms-2"></i>
-                </a>
-            </div>
-        </div>
-    </div>
-</section>
+<?php if ($isAdmin && $showAdminModal): ?>
+    <script>
+        window.addEventListener('load', function() {
+            const modalEl = document.getElementById('adminRestrictionModal');
+            if (modalEl && window.bootstrap) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        });
+    </script>
+<?php endif; ?>
 
 <?php include 'includes/footer.php'; ?>

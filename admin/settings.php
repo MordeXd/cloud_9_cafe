@@ -2,7 +2,9 @@
 require_once '../includes/auth.php';
 requireAdmin();
 require_once '../config/db.php';
+require_once '../includes/upload_helpers.php';
 $pageTitle = 'Cafe Settings - Cloud 9 Cafe';
+$activePage = 'settings';
 
 $message = '';
 $messageType = '';
@@ -14,30 +16,45 @@ if (isset($_POST['settings_btn'])) {
     $address = cleanInput($_POST['address']);
 
     $logoSql = '';
+    $logoPath = '';
+    $uploadError = '';
     if (!empty($_FILES['logo']['name'])) {
-        $logoName = time() . '_' . basename($_FILES['logo']['name']);
-        move_uploaded_file($_FILES['logo']['tmp_name'], '../uploads/' . $logoName);
-        $logoSql = ", logo='$logoName'";
+        [$logoPath, $uploadError] = saveUploadedImage(
+            $_FILES['logo'],
+            'cafe_logo',
+            $cafeName ?: 'cafe',
+            'logo_'
+        );
+
+        if ($uploadError) {
+            $message = $uploadError;
+            $messageType = 'danger';
+        } else {
+            $safePath = mysqli_real_escape_string($con, $logoPath);
+            $logoSql = ", logo='$safePath'";
+        }
     }
 
-    $checkSettings = mysqli_query($con, "SELECT id FROM cafe_settings LIMIT 1");
-    if ($checkSettings && mysqli_num_rows($checkSettings) > 0) {
-        $settings = mysqli_fetch_assoc($checkSettings);
-        $settingsId = $settings['id'];
-        $updateQuery = "UPDATE cafe_settings SET cafe_name='$cafeName', contact_email='$contactEmail', phone='$phone', address='$address' $logoSql WHERE id=$settingsId";
-        $result = mysqli_query($con, $updateQuery);
-    } else {
-        $logoInsert = $logoSql !== '' ? str_replace(', logo=', '', $logoSql) : "''";
-        $insertQuery = "INSERT INTO cafe_settings (cafe_name, contact_email, phone, logo, address) VALUES ('$cafeName', '$contactEmail', '$phone', $logoInsert, '$address')";
-        $result = mysqli_query($con, $insertQuery);
-    }
+    if ($uploadError === '') {
+        $checkSettings = mysqli_query($con, "SELECT id FROM cafe_settings LIMIT 1");
+        if ($checkSettings && mysqli_num_rows($checkSettings) > 0) {
+            $settings = mysqli_fetch_assoc($checkSettings);
+            $settingsId = $settings['id'];
+            $updateQuery = "UPDATE cafe_settings SET cafe_name='$cafeName', contact_email='$contactEmail', phone='$phone', address='$address' $logoSql WHERE id=$settingsId";
+            $result = mysqli_query($con, $updateQuery);
+        } else {
+            $logoInsert = $logoSql !== '' ? str_replace(', logo=', '', $logoSql) : "''";
+            $insertQuery = "INSERT INTO cafe_settings (cafe_name, contact_email, phone, logo, address) VALUES ('$cafeName', '$contactEmail', '$phone', $logoInsert, '$address')";
+            $result = mysqli_query($con, $insertQuery);
+        }
 
-    if ($result) {
-        $message = 'Settings saved successfully.';
-        $messageType = 'success';
-    } else {
-        $message = 'Failed to save settings.';
-        $messageType = 'danger';
+        if ($result) {
+            $message = 'Settings saved successfully.';
+            $messageType = 'success';
+        } else {
+            $message = 'Failed to save settings.';
+            $messageType = 'danger';
+        }
     }
 }
 
@@ -48,20 +65,7 @@ include '../includes/header.php';
 ?>
 <div class="container">
     <div class="dashboard-shell">
-        <aside class="sidebar-card">
-            <h4 class="h6">Admin Panel</h4>
-            <ul class="nav flex-column">
-                <li class="nav-item"><a class="nav-link" href="dashboard.php">Dashboard</a></li>
-                <li class="nav-item"><a class="nav-link" href="menu_items.php">Menu Items</a></li>
-                <li class="nav-item"><a class="nav-link" href="categories.php">Categories</a></li>
-                <li class="nav-item"><a class="nav-link" href="reservations.php">Reservations</a></li>
-                <li class="nav-item"><a class="nav-link" href="orders.php">Orders</a></li>
-                <li class="nav-item"><a class="nav-link" href="users.php">Users</a></li>
-                <li class="nav-item"><a class="nav-link" href="feedback.php">Feedback</a></li>
-                <li class="nav-item"><a class="nav-link active" href="settings.php">Settings</a></li>
-                <li class="nav-item"><a class="nav-link" href="/cloud_9_cafe/logout.php">Logout</a></li>
-            </ul>
-        </aside>
+        <?php include '../includes/admin_sidebar.php'; ?>
         <section class="content-card">
             <h1 class="h3 mb-4">Cafe Settings</h1>
             <?php if ($message !== ''): ?>
@@ -88,7 +92,7 @@ include '../includes/header.php';
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Logo</label>
-                        <input type="file" name="logo" class="form-control" data-validation="fileSize fileType" data-filesize="2" data-filetype="jpg,jpeg,png">
+                        <input type="file" name="logo" class="form-control" data-validation="fileSize fileType" data-filesize="5" data-filetype="jpg,jpeg,png,webp">
                         <span id="logo_error"></span>
                     </div>
                 </div>

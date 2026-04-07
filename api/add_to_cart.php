@@ -48,6 +48,17 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 $auth = new TokenAuth();
+$tokenUser = $auth->getCurrentUser();
+$isAdmin = ($tokenUser && (($tokenUser['type'] ?? '') === 'admin')) || !empty($_SESSION['admin']);
+
+if ($isAdmin) {
+    echo json_encode([
+        'success' => false,
+        'admin_only' => true,
+        'message' => 'Admins cannot place orders. Please login as a customer.'
+    ]);
+    exit();
+}
 // =============================================================================
 // END SECTION: Database & Authentication Include
 // =============================================================================
